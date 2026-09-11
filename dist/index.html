@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Indicadores de segurança do trabalho da INTEP Plásticos">
+  <meta name="theme-color" content="#10253f">
+  <title>Segurança do Trabalho | INTEP</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2310253f'/%3E%3Cpath d='M32 10 52 18v14c0 12-8 19-20 23C20 51 12 44 12 32V18z' fill='%23f5b82e'/%3E%3Cpath d='m22 32 7 7 14-16' fill='none' stroke='%2310253f' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script type="module" src="/assets/sheets-client.js"></script>
+  <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+  <header class="app-header">
+    <a class="brand" href="/" aria-label="Dashboard INTEP">
+      <span class="brand-mark" aria-hidden="true">I</span>
+      <span><strong>INTEP</strong><small>Segurança do Trabalho</small></span>
+    </a>
+    <nav aria-label="Navegação principal">
+      <a class="nav-link active" href="/">Dashboard</a>
+      <a class="nav-link" href="/relatorios">Relatórios</a>
+    </nav>
+    <div class="header-actions"><button class="button ghost" id="theme-toggle" type="button">◐ Modo escuro</button><div class="live-state" id="live-state"><span></span> Conectando</div></div>
+  </header>
+
+  <main id="conteudo" class="shell">
+    <section class="page-heading" aria-labelledby="titulo-dashboard">
+      <div>
+        <p class="eyebrow">Visão operacional</p>
+        <h1 id="titulo-dashboard">Indicadores de segurança</h1>
+      </div>
+      <div class="toolbar">
+        <details class="month-filter" id="month-filter">
+          <summary id="month-summary">Todos os meses</summary>
+          <div class="month-menu" id="month-options" role="group" aria-label="Filtrar por meses"></div>
+        </details>
+        <button class="button secondary" id="refresh-button" type="button">
+          <span aria-hidden="true">↻</span> Atualizar
+        </button>
+        <button class="button secondary" id="pause-button" type="button" aria-pressed="false">Pausar</button>
+      </div>
+    </section>
+
+    <section class="filters-panel" aria-label="Filtros do dashboard">
+      <div class="filters-heading"><strong>Explore seus indicadores</strong><button class="text-button" id="clear-filters" type="button">Limpar filtros</button></div>
+      <div class="filter-grid">
+        <label>Setor<select id="filter-sector"><option value="">Todos os setores</option></select></label>
+        <label>Status<select id="filter-status"><option value="">Todos os status</option><option value="open">Em aberto</option><option value="progress">Em andamento</option><option value="resolved">Resolvida</option><option value="cancelled">Cancelada</option></select></label>
+        <label>Prioridade<select id="filter-priority"><option value="">Todas</option><option value="critical">Crítica</option><option value="high">Alta</option><option value="medium">Média</option><option value="low">Baixa</option><option value="unknown">Não informada</option></select></label>
+        <label>De<input id="filter-start" type="date"></label><label>Até<input id="filter-end" type="date"></label>
+        <label>Buscar nos registros<input id="filter-search" type="search" maxlength="160" placeholder="Máquina, tema, condição..."></label>
+      </div>
+      <details class="advanced-filters"><summary>Mais filtros: turno, registro do DDS e prazo</summary><div class="filter-grid compact-grid"><label>Turno do DDS<select id="filter-shift"><option value="">Todos os turnos</option></select></label><label>DDS registrado<select id="filter-registered"><option value="">Todos</option><option value="yes">Sim</option><option value="no">Não</option></select></label><label class="check-label"><input id="filter-overdue" type="checkbox">Somente prazos vencidos</label></div></details>
+      <p class="filter-note">Todos os gráficos acompanham os filtros. Status, prioridade e prazo se aplicam a inspeções e pendências; turno e registro, somente a DDS. Outros tipos ficam fora desse recorte.</p>
+      <div id="active-filters" class="active-filters" aria-live="polite"></div>
+    </section>
+
+    <div class="status-line" aria-live="polite">
+      <span id="data-status">Carregando dados da planilha...</span>
+      <span id="last-update"></span>
+    </div>
+
+    <section class="risk-rail" aria-label="Situação das pendências">
+      <div><span class="rail-dot critical"></span><strong id="rail-critical">0</strong><small>Críticas ou altas em aberto</small></div>
+      <div><span class="rail-dot attention"></span><strong id="rail-overdue">0</strong><small>Prazos vencidos</small></div>
+      <div><span class="rail-dot progress"></span><strong id="rail-progress">0</strong><small>Em andamento</small></div>
+      <div><span class="rail-dot resolved"></span><strong id="rail-resolved">0</strong><small>Resolvidas</small></div>
+    </section>
+
+    <section class="metric-grid" aria-label="Indicadores principais">
+      <article class="metric-card"><span>Inspeções</span><strong id="metric-inspections">0</strong><small id="metric-inspections-note">no período selecionado</small></article>
+      <article class="metric-card"><span>Taxa de resolução</span><strong id="metric-resolution">0%</strong><small id="metric-resolution-note">sem ocorrências registradas</small></article>
+      <article class="metric-card"><span>Registros de DDS</span><strong id="metric-dds">0</strong><small id="metric-dds-note">Soma das participações informadas</small></article>
+      <article class="metric-card"><span>Dias de ausência</span><strong id="metric-absence">0</strong><small id="metric-absence-note">0 entrevistas</small></article>
+    </section>
+
+    <section class="dashboard-grid">
+      <article class="panel panel-wide">
+        <div class="panel-heading"><div><p class="eyebrow">Evolução</p><h2>Atividades por mês</h2></div><div class="legend" id="trend-legend"></div></div>
+        <div class="chart" id="trend-chart" role="img" aria-label="Atividades por mês"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Tratamento</p><h2>Status das pendências</h2></div></div>
+        <div class="donut-layout"><div class="donut" id="status-donut"><span><strong>0</strong><small>ações</small></span></div><div class="donut-key" id="status-key"></div></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">Concentração</p><h2>Inspeções por setor</h2></div></div>
+        <div class="sector-bars" id="sector-chart"></div>
+      </article>
+
+      <article class="panel records-panel" id="records-panel">
+        <div class="panel-heading"><div><p class="eyebrow">Explorador</p><h2>Todos os registros</h2></div><span class="count-badge" id="actions-count">0 itens</span></div>
+        <div class="records-toolbar"><div class="segmented source-tabs" role="group" aria-label="Tipo de registro"><button data-source="all" class="active" type="button">Todos</button><button data-source="inspections" type="button">Inspeções</button><button data-source="pending" type="button">Pendências</button><button data-source="dds" type="button">DDS</button><button data-source="absences" type="button">Ausências</button></div><label class="sort-label">Ordenar<select id="record-sort"><option value="date-desc">Mais recentes</option><option value="date-asc">Mais antigos</option><option value="due">Prazo mais próximo</option><option value="priority">Maior prioridade</option><option value="sector">Setor A–Z</option></select></label></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data / tipo</th><th>Setor</th><th>Registro / ação</th><th>Prazo</th><th>Prioridade</th><th>Status / registro</th></tr></thead>
+            <tbody id="actions-table"></tbody>
+          </table>
+        </div>
+        <div class="empty-state" id="actions-empty" hidden>
+          <strong>Nenhuma ação encontrada</strong>
+          <span>Os registros aparecerão aqui quando a planilha for preenchida.</span>
+        </div>
+        <div class="pagination"><button class="button secondary" id="prev-page" type="button">← Anterior</button><span id="page-info"></span><button class="button secondary" id="next-page" type="button">Próxima →</button></div>
+      </article>
+    </section>
+    <footer class="dashboard-footer"><span>INTEP · Segurança do trabalho</span><span>Consulta automática a cada 15 s enquanto a página está visível. O Google pode acrescentar atraso.</span><a href="https://docs.google.com/spreadsheets/d/1BcHzuaOFOm2MMs11l-BNBzMmlnzdHdPrnhSnIPk7z30/edit" target="_blank" rel="noopener noreferrer">Abrir planilha ↗</a></footer>
+  </main>
+
+  <button class="assistant-launcher" id="assistant-launcher" type="button" aria-controls="assistant-panel" aria-expanded="false" hidden>
+    <span aria-hidden="true">✦</span> Assistente INTEP
+  </button>
+  <aside class="assistant-panel" id="assistant-panel" aria-labelledby="assistant-title" hidden>
+    <div class="assistant-header"><div><p class="eyebrow">IA integrada</p><h2 id="assistant-title">Seu painel, organizado</h2></div><button class="icon-button" id="assistant-close" type="button" aria-label="Fechar">×</button></div>
+    <div class="assistant-messages" id="assistant-messages" aria-live="polite">
+      <div class="message system">Posso analisar indicadores e organizar este painel: filtrar meses e setores, destacar atrasos, ordenar registros e trocar o tema. O preenchimento continua no Google Sheets.</div>
+    </div>
+    <form id="assistant-form">
+      <label class="sr-only" for="assistant-question">Pergunta</label>
+      <div class="assistant-suggestions"><button type="button" data-command="Mostrar pendências vencidas">Ver atrasos</button><button type="button" data-command="Ativar modo escuro">Modo escuro</button><button type="button" data-command="Qual é o resumo do período?">Resumir período</button></div>
+      <textarea id="assistant-question" maxlength="400" rows="3" placeholder="Ex.: filtre setembro e ordene por prioridade"></textarea>
+      <button type="button" class="text-button" id="undo-ai" hidden>Desfazer organização da IA</button>
+      <div class="assistant-actions"><small id="assistant-limit">IA só é usada ao enviar uma pergunta.</small><button class="button primary" type="submit">Enviar</button></div>
+    </form>
+  </aside>
+</body>
+</html>

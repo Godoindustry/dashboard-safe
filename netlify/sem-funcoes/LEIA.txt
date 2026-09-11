@@ -1,0 +1,7 @@
+Pasta vazia de proposito.
+
+O netlify.toml aponta "functions" para ca para que o Netlify NAO empacote
+nenhuma funcao de servidor. O painel le o Google Sheets direto do navegador.
+
+O codigo das funcoes continua em netlify/functions, fora da publicacao, caso
+um dia alguem queira voltar a usar a IA ou a leitura por conta de servico.

@@ -1,0 +1,39 @@
+# Publicação estática: só a pasta dist.
+# O painel lê o Google Sheets direto do navegador (dist/assets/sheets-client.js),
+# por isso NÃO existe função de servidor aqui. Sem funções, nenhum deploy pode
+# falhar empacotando código, e o consumo de créditos do plano Free fica mínimo.
+#
+# O dist já sai construído e verificado da máquina local:
+#   npm run build && npm run check && npm test
+#
+# Os arquivos dist/_headers e dist/_redirects repetem as regras abaixo, para que
+# arrastar a pasta dist no app.netlify.com/drop produza exatamente o mesmo site.
+
+[build]
+  publish = "dist"
+  # Pasta vazia de proposito: o Netlify procura netlify/functions por padrao,
+  # e empacotar aquelas funcoes quebraria o deploy. Aqui nao ha funcao nenhuma.
+  functions = "netlify/sem-funcoes"
+  command = "echo dist ja construido e verificado localmente"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+[[redirects]]
+  from = "/relatorios"
+  to = "/relatorios.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://docs.google.com; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

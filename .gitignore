@@ -1,0 +1,14 @@
+.netlify/
+.env
+.env.*
+!.env.example
+.source-review/
+node_modules/
+.npm-cache/
+.local-state/
+qa/
+*.zip
+
+# A pasta dist E o site publicado. Nunca ignore, mesmo que um modelo de
+# .gitignore de Node mande ignorar "dist".
+!dist/

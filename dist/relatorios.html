@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Relatórios semanais e mensais de segurança do trabalho da INTEP Plásticos">
+  <meta name="theme-color" content="#10253f">
+  <title>Relatórios | Segurança do Trabalho INTEP</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2310253f'/%3E%3Cpath d='M32 10 52 18v14c0 12-8 19-20 23C20 51 12 44 12 32V18z' fill='%23f5b82e'/%3E%3Cpath d='m22 32 7 7 14-16' fill='none' stroke='%2310253f' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script type="module" src="/assets/sheets-client.js"></script>
+  <script type="module" src="/assets/reports.js"></script>
+</head>
+<body class="reports-page">
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+  <header class="app-header no-print">
+    <a class="brand" href="/" aria-label="Dashboard INTEP"><span class="brand-mark" aria-hidden="true">I</span><span><strong>INTEP</strong><small>Segurança do Trabalho</small></span></a>
+    <nav aria-label="Navegação principal"><a class="nav-link" href="/">Dashboard</a><a class="nav-link active" href="/relatorios">Relatórios</a></nav>
+    <div class="header-actions"><button class="button ghost" id="theme-toggle" type="button">◐ Modo escuro</button><button class="button ghost" id="logout-button" type="button" hidden>Sair</button></div>
+  </header>
+
+  <main id="conteudo" class="shell reports-shell">
+    <section class="access-gate" id="access-gate" hidden>
+      <div class="access-icon" aria-hidden="true">▣</div>
+      <p class="eyebrow">Área exclusiva</p>
+      <h1>Relatórios de segurança</h1>
+      <p>Digite o código de acesso para gerar relatórios semanais e mensais.</p>
+      <form id="access-form">
+        <label for="access-code">Código de acesso</label>
+        <input id="access-code" type="password" autocomplete="current-password" required>
+        <button class="button primary" type="submit">Entrar</button>
+        <span class="form-error" id="access-error" role="alert"></span>
+      </form>
+    </section>
+
+    <section id="reports-workspace" hidden>
+      <div class="page-heading no-print">
+        <div><p class="eyebrow">Área exclusiva</p><h1>Relatórios semanais e mensais</h1></div>
+        <div class="toolbar"><button class="button secondary" id="ai-report-button" type="button" hidden>Gerar análise com IA</button><button class="button primary" id="print-button" type="button">Salvar em PDF</button></div>
+      </div>
+
+      <section class="report-controls no-print" aria-label="Configuração do relatório">
+        <div class="segmented" role="group" aria-label="Tipo de relatório">
+          <button class="active" type="button" data-report-type="weekly">Semanal</button>
+          <button type="button" data-report-type="monthly">Mensal</button>
+        </div>
+        <label id="week-control">Semana de <input id="report-week" type="date"></label>
+        <label id="month-control" hidden>Mês <input id="report-month" type="month"></label>
+        <label>Responsável pela inspeção <input id="report-owner" type="text" value="Técnica de Segurança do Trabalho"></label>
+        <label>Setor<select id="report-sector"><option value="">Todos os setores</option></select></label>
+        <label>Status<select id="report-filter-status"><option value="">Todos</option><option value="open">Em aberto</option><option value="progress">Em andamento</option><option value="resolved">Resolvida</option><option value="cancelled">Cancelada</option></select></label>
+        <label>Prioridade<select id="report-priority"><option value="">Todas</option><option value="critical">Crítica</option><option value="high">Alta</option><option value="medium">Média</option><option value="low">Baixa</option><option value="unknown">Não informada</option></select></label>
+        <label>Buscar<input id="report-search" type="search" maxlength="160" placeholder="Condição, tema ou ação"></label>
+        <button class="button secondary" id="generate-button" type="button">Gerar prévia</button>
+      </section>
+
+      <div class="report-status no-print" id="report-status" aria-live="polite">Preparando os dados...</div>
+      <div class="editor-panel no-print"><label for="report-notes">Observações finais — revise e edite antes de baixar<textarea id="report-notes" rows="4" maxlength="12000" placeholder="Registre aqui as observações finais do período."></textarea></label><p class="filter-note">A revisão e a aprovação técnica são humanas. Alterar o período ou os filtros gera uma nova prévia.</p></div>
+
+      <section class="editor-panel no-print" aria-label="Fotos do relatório">
+        <label for="report-photos">Fotos do relatório — anexe as imagens que devem sair no PDF
+          <input id="report-photos" type="file" accept="image/png,image/jpeg,image/webp" multiple>
+        </label>
+        <p class="filter-note" id="report-photo-count">Nenhuma foto anexada. O PDF é gerado normalmente sem elas.</p>
+        <p class="filter-note">As fotos ficam somente neste navegador e são gravadas dentro do PDF que você baixar. Nada é enviado para a internet. Confira se nenhuma imagem mostra dados pessoais ou informações médicas.</p>
+        <div class="photo-grid" id="report-photo-list"></div>
+      </section>
+
+      <article class="report-paper" id="report-paper">
+        <div class="report-draft-banner" id="report-draft-banner">PRÉVIA · Revisão técnica necessária antes da emissão</div>
+        <header class="report-title-block">
+          <div class="report-company">INTEP PLÁSTICOS</div>
+          <h1 id="report-title">RELATÓRIO SEMANAL DE SEGURANÇA DO TRABALHO</h1>
+          <p>Registro de Condições Observadas e Ações Corretivas</p>
+        </header>
+
+        <table class="report-meta"><tbody>
+          <tr><th>Empresa</th><td>INTEP PLÁSTICOS</td></tr>
+          <tr><th>Áreas / recorte</th><td id="report-areas">Produção, armazenagem e logística</td></tr>
+          <tr><th>Responsável</th><td id="report-meta-owner">Técnica de Segurança do Trabalho</td></tr>
+          <tr><th>Período</th><td id="report-period">-</td></tr>
+        </tbody></table>
+
+        <section><h2>1. OBJETIVO</h2><p id="report-objective">Registrar as condições de segurança identificadas durante o período, indicando os riscos observados e as ações corretivas recomendadas.</p></section>
+
+        <section><h2>2. INDICADORES DO PERÍODO</h2><div class="report-metrics" id="report-metrics"></div></section>
+
+        <section><h2>3. REGISTRO DAS CONDIÇÕES OBSERVADAS</h2>
+          <table class="report-findings"><thead><tr><th>Local</th><th>Condição observada</th><th>Risco</th><th>Ação corretiva</th><th>Prioridade</th></tr></thead><tbody id="report-findings-body"></tbody></table>
+          <p class="report-empty" id="report-findings-empty" hidden>Não houve condições registradas no período selecionado.</p>
+        </section>
+
+        <section><h2>4. ACOMPANHAMENTO DAS PENDÊNCIAS</h2><div class="report-table-scroll"><table><thead><tr><th>Setor / pendência</th><th>Ação</th><th>Responsável</th><th>Prazo / status</th></tr></thead><tbody id="report-pending-body"></tbody></table></div></section>
+
+        <section><h2>5. REFERÊNCIAS DO MODELO — VALIDAR APLICABILIDADE</h2><p>O documento-base indica NR-01, NR-11, NR-12, NR-23 e NR-35. A pessoa responsável deve verificar a versão vigente e a aplicabilidade antes da emissão. Esta prévia não atesta conformidade normativa.</p></section>
+
+        <section><h2>6. OBSERVAÇÕES FINAIS</h2><p id="report-conclusion">Sem observações adicionais.</p><div class="ai-summary" id="report-ai-summary" hidden></div></section>
+
+        <section><h2>7. REGISTRO FOTOGRÁFICO</h2><div class="report-photos" id="report-photo-preview"></div></section>
+
+        <footer class="report-signature"><p>Responsável pela inspeção: <span id="report-signature-owner">____________________________________</span></p><p>Técnica de Segurança do Trabalho</p><p>Data: <span id="report-date">____/____/________</span></p></footer>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

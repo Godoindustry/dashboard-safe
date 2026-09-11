@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-09-11T14:00:00.000Z",
+  "source": "demonstracao",
+  "months": ["2026-08", "2026-09"],
+  "inspections": [
+    {"date":"2026-08-12","sector":"Almoxarifado","item":"Faixa de circulação","condition":"Materiais ocupando parte da área demarcada.","risk":"Colisão e tropeço.","action":"Reorganizar os materiais e manter as faixas livres.","due":"2026-08-19","status":"Resolvida","priority":"Média"},
+    {"date":"2026-08-19","sector":"Produção","item":"Extintor","condition":"Carrinhos próximos à área demarcada do extintor.","risk":"Dificuldade de acesso em emergência.","action":"Manter a área do extintor livre.","due":"2026-08-20","status":"Resolvida","priority":"Alta"},
+    {"date":"2026-09-02","sector":"Produção","item":"Máquina 29","condition":"Acúmulo de óleo no piso próximo à base da máquina.","risk":"Escorregamento e agravamento do vazamento.","action":"Conter o óleo, limpar e solicitar manutenção.","due":"2026-09-05","status":"Em andamento","priority":"Alta"},
+    {"date":"2026-09-03","sector":"Armazenagem","item":"Hidrante","condition":"Materiais próximos ao acesso do hidrante.","risk":"Dificuldade de acesso em emergência.","action":"Retirar obstáculos e manter o hidrante desobstruído.","due":"2026-09-04","status":"Aberta","priority":"Crítica"},
+    {"date":"2026-09-05","sector":"Armazenagem","item":"Porta-pallet A-50","condition":"Cargas inclinadas e embalagens deformadas.","risk":"Queda de materiais.","action":"Reorganizar as cargas e substituir embalagens danificadas.","due":"2026-09-12","status":"Em andamento","priority":"Alta"},
+    {"date":"2026-09-08","sector":"Logística","item":"Plataforma de carregamento","condition":"Laterais podem expor trabalhadores à queda.","risk":"Queda para nível inferior.","action":"Avaliar e instalar proteção coletiva compatível.","due":"2026-09-18","status":"Aberta","priority":"Alta"}
+  ],
+  "dds": [
+    {"date":"2026-08-14","topic":"Organização e limpeza","sector":"Produção","participants":18,"registered":true},
+    {"date":"2026-09-01","topic":"Acesso a equipamentos de emergência","sector":"Produção","participants":21,"registered":true},
+    {"date":"2026-09-08","topic":"Armazenagem segura","sector":"Logística","participants":16,"registered":true}
+  ],
+  "absences": [
+    {"interviewDate":"2026-08-21","sector":"Produção","days":1,"notified":true},
+    {"interviewDate":"2026-09-04","sector":"Logística","days":2,"notified":true},
+    {"interviewDate":"2026-09-09","sector":"Produção","days":1,"notified":false}
+  ],
+  "pending": [
+    {"date":"2026-09-03","sector":"Armazenagem","description":"Desobstruir o acesso ao hidrante","due":"2026-09-04","status":"Aberta","priority":"Crítica","action":"Retirar obstáculos"},
+    {"date":"2026-09-08","sector":"Logística","description":"Avaliar proteção coletiva da plataforma","due":"2026-09-18","status":"Aberta","priority":"Alta","action":"Avaliação técnica"}
+  ]
+}
