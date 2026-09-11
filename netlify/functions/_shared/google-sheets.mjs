@@ -76,7 +76,7 @@ function parseGviz(body) {
 
 async function fetchPublicSheet(spreadsheetId, sheetName) {
   const params = new URLSearchParams({ tqx: "out:json", headers: "1", sheet: sheetName });
-  const response = await fetch(`https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq?${params}`, { signal: AbortSignal.timeout(10000), headers: { "User-Agent": "INTEP-Safety-Dashboard/2.0" } });
+  const response = await fetch(`https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq?${params}`, { signal: AbortSignal.timeout(10000), headers: { "User-Agent": "SAFE-Dashboard/2.0" } });
   if (!response.ok) throw new Error(`A aba ${sheetName} não pôde ser lida (${response.status}).`);
   return parseGviz(await response.text());
 }

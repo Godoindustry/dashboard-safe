@@ -5,7 +5,7 @@ import { formatDate } from '../dist/assets/shared.js';
 const text = value => String(value || 'Não informado').replace(/[\u0000-\u0008]/g,'');
 export function createReportPdf(report) {
   const doc=new jsPDF({unit:'mm',format:'letter',compress:true});
-  doc.setProperties({title:report.title,subject:report.period,author:'INTEP Plásticos',creator:'INTEP Segurança'});
+  doc.setProperties({title:report.title,subject:report.period,author:'SAFE',creator:'SAFE Segurança'});
   const margin=18, width=180, bottom=257; let y=20;
   const page=()=>{doc.addPage();y=22;};
   const paragraph=(content,size=9,bold=false)=>{
@@ -18,11 +18,11 @@ export function createReportPdf(report) {
     autoTable(doc,{startY:y,head:[head],body,margin:{top:22,right:18,bottom:23,left:18},tableWidth:width,styles:{font:'helvetica',fontSize:8,cellPadding:2.4,overflow:'linebreak',valign:'top',textColor:[25,35,48],lineColor:[220,226,232],lineWidth:.15},headStyles:{fillColor:[23,56,90],textColor:[255,255,255],fontStyle:'bold'},alternateRowStyles:{fillColor:[243,246,249]},columnStyles,rowPageBreak:'avoid',showHead:'everyPage'});y=doc.lastAutoTable.finalY+6;
   };
   doc.setFillColor(16,37,63);doc.rect(0,0,216,10,'F');
-  paragraph('INTEP PLÁSTICOS',11,true);
+  paragraph('SAFE',11,true);
   paragraph(report.title,15,true);
   paragraph('Registro de Condições Observadas e Ações Corretivas',9);
   paragraph(report.demo?'DEMONSTRAÇÃO — DADOS FICTÍCIOS. NÃO UTILIZAR COMO RELATÓRIO REAL.':'PRÉVIA — Revisão e aprovação técnica necessárias antes da emissão.',9,true);
-  table(['Empresa','Responsável','Período'],[['INTEP PLÁSTICOS',text(report.owner),report.period]]);
+  table(['Empresa','Responsável','Período'],[['SAFE',text(report.owner),report.period]]);
   paragraph(`Recorte: ${report.filterLabel}`,8);
   paragraph(`Dados consultados em: ${new Date(report.generatedAt || report.emittedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}`,8);
   heading('1. OBJETIVO');paragraph(OBJECTIVE);
@@ -59,7 +59,7 @@ export function createReportPdf(report) {
   }
   if(y+32>bottom)page(); y+=12;doc.setDrawColor(110,120,130);doc.line(margin,y,margin+90,y);y+=5;paragraph(`Responsável: ${text(report.owner)}`);paragraph('Revisão / aprovação: ____________________     Data: ____/____/________',8);
   const count=doc.getNumberOfPages();
-  for(let i=1;i<=count;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(100);doc.text(`INTEP | ${report.demo?'DEMONSTRAÇÃO':'PRÉVIA PARA REVISÃO'} | ${report.period}`,margin,268);doc.text(`${i} / ${count}`,198,268,{align:'right'});}
+  for(let i=1;i<=count;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(100);doc.text(`SAFE | ${report.demo?'DEMONSTRAÇÃO':'PRÉVIA PARA REVISÃO'} | ${report.period}`,margin,268);doc.text(`${i} / ${count}`,198,268,{align:'right'});}
   return doc;
 }
-export function downloadReport(report) { createReportPdf(report).save(`INTEP_${report.type==='monthly'?'Mensal':'Semanal'}_${report.filters.start}${report.demo?'_DEMONSTRACAO':''}.pdf`); }
+export function downloadReport(report) { createReportPdf(report).save(`SAFE_${report.type==='monthly'?'Mensal':'Semanal'}_${report.filters.start}${report.demo?'_DEMONSTRACAO':''}.pdf`); }

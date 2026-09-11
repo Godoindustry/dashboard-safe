@@ -4,9 +4,9 @@ import { setTheme } from './theme.js';
 const $ = id => document.getElementById(id);
 const demo = new URLSearchParams(location.search).get('demo') === '1';
 const state = { data: null, filtered: {}, filters: emptyFilters(), source: 'all', sort: 'date-desc', page: 1, busy: false, paused: false, failures: 0, etag: '', timer: null, undo: null };
-try { state.filters = validateFilters(JSON.parse(localStorage.getItem('intep-filters') || '{}')); } catch {}
+try { state.filters = validateFilters(JSON.parse(localStorage.getItem('safe-filters') || '{}')); } catch {}
 if (demo) document.querySelectorAll('a[href="/relatorios"]').forEach(a => a.href = '/relatorios?demo=1');
-function persist() { try { localStorage.setItem('intep-filters', JSON.stringify(state.filters)); } catch {} }
+function persist() { try { localStorage.setItem('safe-filters', JSON.stringify(state.filters)); } catch {} }
 function options(id, values, all) { const select = $(id); select.innerHTML = `<option value="">${all}</option>` + values.map(x => `<option value="${e(x)}">${e(x)}</option>`).join(''); }
 function syncControls() {
   for (const key of Object.keys(emptyFilters()).filter(k => k !== 'months')) { const input = $(`filter-${key}`); if (input) input.type === 'checkbox' ? input.checked = state.filters[key] : input.value = state.filters[key]; }

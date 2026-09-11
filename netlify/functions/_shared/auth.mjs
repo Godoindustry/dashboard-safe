@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-const COOKIE_NAME = "intep_reports_session";
+const COOKIE_NAME = "safe_reports_session";
 
 function parseCookies(header = "") {
   return Object.fromEntries(header.split(";").map((item) => item.trim()).filter(Boolean).map((item) => {

@@ -16,7 +16,7 @@ async function run(file,args,quiet=false){
 }
 const cli=(...args)=>run(npx,['--yes','netlify-cli@27.5.2',...args]);
 try{
-  console.log('\nINTEP — Publicação guiada no Netlify\nO site será público. Use uma conta no plano Free, com recarga automática desativada.');
+  console.log('\nSAFE — Publicação guiada no Netlify\nO site será público. Use uma conta no plano Free, com recarga automática desativada.');
   console.log('Não envie o arquivo .env.local para repositórios ou pastas públicas.');
   const answer=await prompt.question('Continuar com a preparação? Digite SIM: ');
   if(answer.trim().toUpperCase()!=='SIM')process.exit(0);

@@ -1,4 +1,4 @@
-# DASHBOARD SAFE · INTEP
+# DASHBOARD SAFE · SAFE
 
 Dashboard de segurança do trabalho, Google Sheets, Groq e Netlify. Versão 2.0.
 
