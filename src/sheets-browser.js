@@ -18,6 +18,32 @@ const SHEETS = {
   pending: "Pendências",
 };
 
+// Abas com formato livre: titulo, linha de identificacao e so entao o cabecalho.
+// Sao lidas em linhas cruas (headers=0) e interpretadas em data.mjs.
+const ABAS_LIVRES = { daily: "Indicativo Diário", summary: "Resumo Mensal" };
+
+// Tabela gviz em linhas cruas, preservando a ordem das colunas.
+function gvizRows(body) {
+  const start = body.indexOf("{");
+  const end = body.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("A planilha não está disponível para leitura pública.");
+  const json = body.slice(start, end + 1).replace(/("(?:\\.|[^"\\])*")|Date\(\d+,\d+,\d+(?:,\d+,\d+,\d+)?\)/g, (match, quoted) => quoted || JSON.stringify(match));
+  const parsed = JSON.parse(json);
+  if (parsed.status === "error") throw new Error("O Google recusou a leitura da planilha.");
+  const largura = (parsed.table?.cols || []).length;
+  return (parsed.table?.rows || []).map((row) => Array.from({ length: largura }, (_, index) => {
+    const cell = row.c?.[index];
+    return String(cell?.f ?? cell?.v ?? "");
+  }));
+}
+
+async function fetchFreeSheet(name) {
+  const params = new URLSearchParams({ tqx: "out:json", headers: "0", sheet: name });
+  const response = await originalFetch(`https://docs.google.com/spreadsheets/d/${encodeURIComponent(SHEET_ID)}/gviz/tq?${params}`, { signal: AbortSignal.timeout(10000), credentials: "omit" });
+  if (!response.ok) return [];
+  try { return gvizRows(await response.text()); } catch { return []; }
+}
+
 // Mesma analise de resposta gviz usada no servidor.
 function parseGviz(body) {
   const start = body.indexOf("{");
@@ -87,9 +113,10 @@ async function workbook() {
     if (!inFlight) {
       inFlight = Promise.all([
         Promise.all(Object.entries(SHEETS).map(async ([key, name]) => [key, await fetchSheet(name)])),
+        Promise.all(Object.entries(ABAS_LIVRES).map(async ([key, name]) => [key, await fetchFreeSheet(name)])),
         fetchSectorList(),
       ])
-        .then(([entries, sectors]) => { cached = { data: Object.fromEntries(entries), sectors, time: Date.now() }; })
+        .then(([entries, livres, sectors]) => { cached = { data: { ...Object.fromEntries(entries), ...Object.fromEntries(livres) }, sectors, time: Date.now() }; })
         .finally(() => { inFlight = null; });
     }
     await inFlight;

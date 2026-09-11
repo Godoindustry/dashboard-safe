@@ -43,7 +43,24 @@ function render() {
   $('metric-absence').textContent = m.absenceDays;
   $('metric-absence-note').textContent = `${m.interviews} entrevistas · data da entrevista`;
   $('active-filters').textContent = filterDescription(state.filters);
-  renderTrend(); renderStatus(); renderSectors(); renderTable();
+  renderTrend(); renderStatus(); renderSectors(); renderDaily(); renderSummary(); renderTable();
+}
+// Indicativo diário: rotina do dia, sem histórico. Não entra nos gráficos por mês.
+function renderDaily() {
+  const daily = state.data.daily || { items: [] }, items = daily.items || [];
+  const done = items.filter(r => r.done).length;
+  $('daily-count').textContent = items.length ? `${done} de ${items.length} com status` : '0 atividades';
+  $('daily-meta').textContent = items.length
+    ? [daily.date && `Data: ${daily.date}`, daily.owner && `Responsável: ${daily.owner}`, 'Preenchimento na aba Indicativo Diário'].filter(Boolean).join(' · ')
+    : 'A aba Indicativo Diário ainda não tem atividades preenchidas.';
+  $('daily-list').innerHTML = items.length ? items.map(r => `<div class="daily-item${r.done ? ' done' : ''}"><span class="daily-time">${e(r.time || '—')}<small>${e(r.period || '')}</small></span><span class="daily-main"><strong>${e(r.activity)}</strong>${r.detail ? `<small>${e(r.detail)}</small>` : ''}${r.notes ? `<small class="daily-note">Obs.: ${e(r.notes)}</small>` : ''}</span><span class="daily-side">${r.sector ? `<span class="daily-sector">${e(r.sector)}</span>` : ''}<span class="status-chip ${r.done ? 'resolved' : 'open'}">${r.status ? e(r.status) : 'Sem status'}</span></span></div>`).join('') : '<div class="chart-empty">Sem atividades registradas no indicativo diário.</div>';
+}
+// Resumo mensal: os valores são digitados na planilha, não calculados aqui.
+function renderSummary() {
+  const items = state.data.summary?.items || [];
+  const filled = items.filter(r => r.filled).length;
+  $('summary-count').textContent = items.length ? `${filled} de ${items.length} preenchidos` : '0 indicadores';
+  $('summary-list').innerHTML = items.length ? items.map(r => `<div class="summary-row"><span>${e(r.indicator)}${r.notes ? `<small>${e(r.notes)}</small>` : ''}</span><strong>${r.filled ? e(r.amount) : '—'}</strong></div>`).join('') : '<div class="chart-empty">A aba Resumo Mensal ainda não foi preenchida.</div>';
 }
 function renderTrend() {
   const colors = [COLORS.blue, COLORS.cyan, COLORS.yellow];

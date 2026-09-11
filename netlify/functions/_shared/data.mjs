@@ -86,6 +86,11 @@ function mapAbsence(row) {
     sector: pick(source, "Setor", "Área"),
     days: asNumber(pick(source, "Qtd. dias", "Qtd dias", "Quantidade de dias", "Dias")),
     notified: asBoolean(pick(source, "Ausência comunicada?", "Ausência comunicada", "Comunicada")),
+    // Indicadores de controle, sim ou nao. Nao identificam a pessoa nem revelam
+    // o motivo. Nome, CID, motivo, descricao do ocorrido e orientacao/restricao
+    // continuam fora: sao dados pessoais e medicos, e o painel e publico.
+    certificate: asBoolean(pick(source, "Atestado/documento?", "Atestado/documento", "Atestado")),
+    fitOnReturn: asBoolean(pick(source, "Apto no retorno?", "Apto no retorno")),
   };
 }
 
@@ -104,6 +109,7 @@ function mapPending(row, detail) {
   };
   if (detail === "report") {
     mapped.owner = pick(source, "Responsável", "Responsavel");
+    mapped.evidence = pick(source, "Evidência", "Evidencia", "Foto/Evidência");
     mapped.notes = pick(source, "Observações");
   }
   return mapped;
@@ -127,6 +133,89 @@ function dateMonth(value) {
   return "";
 }
 
+// A aba "Indicativo Diário" nao segue o formato das outras: tem titulo na primeira
+// linha, uma linha de identificacao (Empresa / Responsavel / Data) e so entao o
+// cabecalho real. A coluna "Período" vem mesclada, entao as linhas seguintes
+// chegam vazias e herdam o periodo anterior.
+// Recebe as linhas cruas, em array, e nao objetos por cabecalho.
+const DAILY_DONE = /^(ok|feito|concluid|realizad|sim|pronto)/;
+
+export function mapDailyIndicator(rows = []) {
+  // A planilha usa espacos para alinhar dentro da celula; colapsamos para exibir.
+  const table = (rows || []).map((row) => (Array.isArray(row) ? row.map((cell) => String(cell ?? "").replace(/\s+/g, " ").trim()) : []));
+  const headerIndex = table.findIndex((row) => row.some((cell) => normalize(cell) === "atividade"));
+  if (headerIndex < 0) return { owner: "", date: "", items: [] };
+  const headers = table[headerIndex].map(normalize);
+  const at = (...names) => {
+    for (const name of names) { const index = headers.indexOf(normalize(name)); if (index >= 0) return index; }
+    return -1;
+  };
+  const columns = { period: at("Período"), time: at("Horário"), activity: at("Atividade"), sector: at("Setor"), detail: at("Detalhamento"), status: at("Status"), notes: at("Observações") };
+
+  // "____/____/______" e campo em branco, nao uma data.
+  const semPlaceholder = (value) => {
+    const texto = String(value || "").replace(/_+/g, "").trim();
+    return /^[/\-.\s]*$/.test(texto) ? "" : texto;
+  };
+  const valorDoRotulo = (row, index) => {
+    const cell = row[index] || "";
+    const inline = cell.includes(":") ? cell.slice(cell.indexOf(":") + 1).trim() : "";
+    if (inline) return semPlaceholder(inline);
+    for (let i = index + 1; i < row.length; i++) {
+      const vizinho = String(row[i] || "").trim();
+      if (!vizinho) continue;
+      if (vizinho.endsWith(":")) break; // e o proximo rotulo, nao o valor deste
+      return semPlaceholder(vizinho);
+    }
+    return "";
+  };
+
+  let owner = "", date = "";
+  for (const row of table.slice(0, headerIndex)) {
+    row.forEach((cell, index) => {
+      const key = normalize(cell);
+      if (!owner && key.startsWith("responsavel")) owner = valorDoRotulo(row, index);
+      if (!date && key.startsWith("data")) date = valorDoRotulo(row, index);
+    });
+  }
+
+  let period = "";
+  const items = [];
+  for (const row of table.slice(headerIndex + 1)) {
+    if (columns.period >= 0 && row[columns.period]) period = row[columns.period];
+    const value = (key) => (columns[key] >= 0 ? row[columns[key]] || "" : "");
+    const activity = value("activity");
+    if (!activity) continue;
+    const status = value("status");
+    items.push({ period, time: value("time"), activity, sector: value("sector"), detail: value("detail"), status, done: DAILY_DONE.test(normalize(status)), notes: value("notes") });
+  }
+  return { owner, date, items };
+}
+
+// Aba "Resumo Mensal": titulo na primeira linha, depois o cabecalho
+// Indicador | Quantidade | Observações e as linhas de indicadores.
+// Tambem chega em linhas cruas, em array.
+export function mapMonthlySummary(rows = []) {
+  const table = (rows || []).map((row) => (Array.isArray(row) ? row.map((cell) => String(cell ?? "").replace(/\s+/g, " ").trim()) : []));
+  const headerIndex = table.findIndex((row) => row.some((cell) => normalize(cell) === "indicador"));
+  if (headerIndex < 0) return { items: [] };
+  const headers = table[headerIndex].map(normalize);
+  const at = (...names) => {
+    for (const name of names) { const index = headers.indexOf(normalize(name)); if (index >= 0) return index; }
+    return -1;
+  };
+  const columns = { indicator: at("Indicador"), amount: at("Quantidade"), notes: at("Observações") };
+  const items = [];
+  for (const row of table.slice(headerIndex + 1)) {
+    const value = (key) => (columns[key] >= 0 ? row[columns[key]] || "" : "");
+    const indicator = value("indicator");
+    if (!indicator) continue;
+    const amount = value("amount");
+    items.push({ indicator, amount, filled: String(amount).trim() !== "", notes: value("notes") });
+  }
+  return { items };
+}
+
 export function transformWorkbook(raw, { detail = "public" } = {}) {
   const inspections = (raw.inspections || []).map((row) => mapInspection(row, detail)).filter(isMeaningful);
   const dds = (raw.dds || []).map((row) => mapDds(row, detail)).filter(isMeaningful);
@@ -138,7 +227,7 @@ export function transformWorkbook(raw, { detail = "public" } = {}) {
     ...absences.map((item) => dateMonth(item.interviewDate || item.absenceDate)),
     ...pending.map((item) => dateMonth(item.date)),
   ].filter(Boolean))].sort();
-  return { inspections, dds, absences, pending, months };
+  return { inspections, dds, absences, pending, months, daily: mapDailyIndicator(raw.daily), summary: mapMonthlySummary(raw.summary) };
 }
 
 export function containsSensitiveAbsenceFields(payload) {

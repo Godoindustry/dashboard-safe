@@ -92,6 +92,23 @@
         <div class="sector-bars" id="sector-chart"></div>
       </article>
 
+      <article class="panel panel-wide" id="daily-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Rotina do dia</p><h2>Indicativo diário</h2></div>
+          <span class="count-badge" id="daily-count">0 atividades</span>
+        </div>
+        <p class="panel-note" id="daily-meta"></p>
+        <div class="daily-list" id="daily-list"></div>
+      </article>
+
+      <article class="panel" id="summary-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Consolidado</p><h2>Resumo mensal</h2></div>
+          <span class="count-badge" id="summary-count">0 indicadores</span>
+        </div>
+        <div class="summary-list" id="summary-list"></div>
+      </article>
+
       <article class="panel records-panel" id="records-panel">
         <div class="panel-heading"><div><p class="eyebrow">Explorador</p><h2>Todos os registros</h2></div><span class="count-badge" id="actions-count">0 itens</span></div>
         <div class="records-toolbar"><div class="segmented source-tabs" role="group" aria-label="Tipo de registro"><button data-source="all" class="active" type="button">Todos</button><button data-source="inspections" type="button">Inspeções</button><button data-source="pending" type="button">Pendências</button><button data-source="dds" type="button">DDS</button><button data-source="absences" type="button">Ausências</button></div><label class="sort-label">Ordenar<select id="record-sort"><option value="date-desc">Mais recentes</option><option value="date-asc">Mais antigos</option><option value="due">Prazo mais próximo</option><option value="priority">Maior prioridade</option><option value="sector">Setor A–Z</option></select></label></div>

@@ -18,7 +18,7 @@ test("mapeia as abas e remove dados médicos e pessoais do absenteísmo", () => 
   assert.equal(result.inspections[0].sector, "Produção");
   assert.equal(result.inspections[0].owner, undefined);
   assert.equal(result.dds[0].participants, 12);
-  assert.deepEqual(result.absences[0], { interviewDate: "09/09/2026", absenceDate: "", sector: "Logística", days: 2, notified: false });
+  assert.deepEqual(result.absences[0], { interviewDate: "09/09/2026", absenceDate: "", sector: "Logística", days: 2, notified: false, certificate: false, fitOnReturn: false });
   assert.equal(containsSensitiveAbsenceFields(result), false);
   assert.deepEqual(result.months, ["2026-09"]);
 });
