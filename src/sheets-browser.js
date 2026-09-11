@@ -97,6 +97,35 @@ async function workbook() {
   return cached;
 }
 
+const chave = (valor) => String(valor).normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
+
+// Os setores estao numa validacao de dados do Google Sheets (o menu que aparece
+// ao clicar na celula). Esse tipo de lista NAO fica em celula nenhuma e a leitura
+// publica do Google nao consegue ve-la, por isso ela vive aqui.
+// "Todos os setores" nao entra: ja e a opcao fixa do seletor.
+// Qualquer setor novo que apareca na coluna U ou nos registros se junta a esta
+// lista automaticamente, sem precisar mexer no codigo.
+const SETORES_PADRAO = ["Matéria Prima", "Moinho", "Logística", "Produção", "Manutenção", "Ferramentaria", "Montagem", "Embarque", "Galpão"];
+
+// A lista suspensa junta duas fontes: a coluna U da aba DDS e os setores que ja
+// aparecem nos registros. Assim ela funciona se a planilha guardar a lista em
+// celulas e tambem se usar apenas a validacao de dados do Google, que a leitura
+// publica nao consegue enxergar.
+function mesclarSetores(listados = [], usados = []) {
+  const vistos = new Set();
+  const resultado = [];
+  for (const valor of [...listados, ...usados]) {
+    const texto = String(valor ?? "").trim();
+    if (!texto) continue;
+    const k = chave(texto);
+    // "Todos os setores" ja e a opcao fixa do seletor.
+    if (k === "todos os setores" || vistos.has(k)) continue;
+    vistos.add(k);
+    resultado.push(texto);
+  }
+  return resultado;
+}
+
 async function snapshot(detail) {
   const source = await workbook();
   const data = transformWorkbook(source.data, { detail });
@@ -104,7 +133,7 @@ async function snapshot(detail) {
   const count = ["inspections", "dds", "pending", "absences"].reduce((sum, key) => sum + data[key].length, 0);
   const payload = {
     ...data,
-    sectors: source.sectors || [],
+    sectors: mesclarSetores(SETORES_PADRAO, [...(source.sectors || []), ...["inspections", "dds", "pending", "absences"].flatMap((key) => (data[key] || []).map((row) => row.sector))]),
     generatedAt: new Date(source.time).toISOString(),
     source: "navegador-direto",
     message: count
@@ -141,21 +170,25 @@ async function localApi(path, init = {}) {
   }
 }
 
-// 'auto' = ainda nao sabemos se existe servidor; 'server' = existe; 'local' = nao existe.
-let mode = "auto";
+// Por ENDPOINT, nunca global: numa publicacao com /api/ia de verdade e sem
+// /api/dados, a rota da IA precisa continuar indo ao servidor mesmo depois de
+// /api/dados ter caido para a leitura direta da planilha.
+// 'server' = existe no servidor; 'local' = respondido aqui no navegador.
+const modos = new Map();
 
 globalThis.fetch = async function (input, init) {
   const path = typeof input === "string" ? input : input instanceof URL ? input.href : input?.url || "";
   if (!path.startsWith("/api/")) return originalFetch(input, init);
-  if (mode === "local") return localApi(path, init);
+  const rota = new URL(path, location.origin).pathname;
+  if (modos.get(rota) === "local") return localApi(path, init);
   try {
     const response = await originalFetch(input, init);
-    if (response.status === 404) { mode = "local"; return localApi(path, init); }
-    mode = "server";
+    if (response.status === 404) { modos.set(rota, "local"); return localApi(path, init); }
+    modos.set(rota, "server");
     return response;
   } catch (error) {
-    if (mode === "server") throw error;
-    mode = "local";
+    if (modos.get(rota) === "server") throw error;
+    modos.set(rota, "local");
     return localApi(path, init);
   }
 };
