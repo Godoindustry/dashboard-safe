@@ -16,7 +16,8 @@ test("mapeia as abas e remove dados médicos e pessoais do absenteísmo", () => 
     pending: [],
   });
   assert.equal(result.inspections[0].sector, "Produção");
-  assert.equal(result.inspections[0].owner, undefined);
+  // O painel mostra a aba inteira: Responsavel, Evidencia e Observacoes tambem no detalhe publico.
+  assert.equal(result.inspections[0].owner, "Pessoa A");
   assert.equal(result.dds[0].participants, 12);
   assert.deepEqual(result.absences[0], { interviewDate: "09/09/2026", absenceDate: "", sector: "Logística", days: 2, notified: false, certificate: false, fitOnReturn: false });
   assert.equal(containsSensitiveAbsenceFields(result), false);

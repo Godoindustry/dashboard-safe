@@ -378,3 +378,20 @@ select { width: 100%; min-height: 44px; font: inherit; padding: .65rem .6rem; bo
 .summary-row small { font-size: .7rem; color: var(--muted); }
 .summary-row strong { font-size: 1.05rem; }
 @media(max-width:620px) { .daily-item { grid-template-columns: 1fr; } .daily-side { align-items: flex-start; } }
+
+/* Estado pausado precisa ser visível, não um detalhe no canto */
+.live-state.paused { color: var(--yellow-700, #8a6100); }
+.live-state.paused span { background: var(--yellow-500, #f5b82e); animation: none; }
+#pause-button.active { background: var(--yellow-500, #f5b82e); border-color: var(--yellow-500, #f5b82e); color: #10253f; font-weight: 700; }
+#last-update { font-variant-numeric: tabular-nums; }
+
+/* Barra de período: o painel abre no dia de hoje */
+.period-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .9rem; }
+.period-label { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-right: .2rem; }
+.period-button { font: inherit; font-size: .78rem; padding: .35rem .75rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.period-button:hover { border-color: var(--blue-500, #2878b5); }
+.period-button.active { background: var(--navy-900, #10253f); border-color: var(--navy-900, #10253f); color: #fff; font-weight: 700; }
+.period-current { font-size: .76rem; color: var(--muted); margin-left: auto; }
+.empty-hint { display: block; margin-top: .4rem; font-weight: 600; color: var(--heading); }
+#daily-panel.stale { border-color: var(--yellow-500, #f5b82e); }
+@media(max-width:620px) { .period-current { margin-left: 0; width: 100%; } }

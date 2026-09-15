@@ -1,9 +1,9 @@
-import { escapeHtml as e, monthLabel, recordMonth, calculateMetrics, fetchJson, formatDate, statusBucket, priorityBucket, isOverdue, normalizeText, COLORS } from './shared.js';
+import { escapeHtml as e, monthLabel, recordMonth, calculateMetrics, fetchJson, formatDate, statusBucket, priorityBucket, isOverdue, normalizeText, toDateKey, dayKeyInSaoPaulo, monthStartInSaoPaulo, COLORS } from './shared.js';
 import { emptyFilters, validateFilters, filterData, flattenRecords, sortRecords, filterDescription, validateActions, STATUS_LABELS, PRIORITY_LABELS, TYPE_LABELS } from './filters.js';
 import { setTheme } from './theme.js';
 const $ = id => document.getElementById(id);
 const demo = new URLSearchParams(location.search).get('demo') === '1';
-const state = { data: null, filtered: {}, filters: emptyFilters(), source: 'all', sort: 'date-desc', page: 1, busy: false, paused: false, failures: 0, etag: '', timer: null, undo: null };
+const state = { data: null, filtered: {}, filters: emptyFilters(), source: 'all', sort: 'date-desc', page: 1, busy: false, paused: false, failures: 0, etag: '', timer: null, undo: null, periodo: 'hoje' };
 try { state.filters = validateFilters(JSON.parse(localStorage.getItem('safe-filters') || '{}')); } catch {}
 if (demo) document.querySelectorAll('a[href="/relatorios"]').forEach(a => a.href = '/relatorios?demo=1');
 function persist() { try { localStorage.setItem('safe-filters', JSON.stringify(state.filters)); } catch {} }
@@ -28,7 +28,62 @@ function populateOptions() {
   $('month-options').innerHTML = `<div class="month-actions"><button type="button" class="text-button" data-months="all">Todos</button><button type="button" class="text-button" data-months="latest">Mais recente</button></div>` + (months.length ? months.map(m => `<label><input type="checkbox" value="${e(m)}">${m === 'undated' ? 'Sem data' : e(monthLabel(m))}</label>`).join('') : '<p class="filter-note">Os meses aparecerão após o preenchimento das datas.</p>');
   syncControls();
 }
-function applyFilters() { state.page = 1; state.filters = validateFilters(state.filters); syncControls(); persist(); render(); }
+// O painel é de acompanhamento diário: abre no dia de hoje e vira sozinho à
+// meia-noite. Os outros dias continuam na planilha, a um clique nos botões.
+const PERIODOS = {
+  hoje:  () => ({ start: dayKeyInSaoPaulo(0),  end: dayKeyInSaoPaulo(0) }),
+  ontem: () => ({ start: dayKeyInSaoPaulo(-1), end: dayKeyInSaoPaulo(-1) }),
+  '7':   () => ({ start: dayKeyInSaoPaulo(-6), end: dayKeyInSaoPaulo(0) }),
+  mes:   () => ({ start: monthStartInSaoPaulo(), end: dayKeyInSaoPaulo(0) }),
+  tudo:  () => ({ start: '', end: '' }),
+};
+const ROTULO_PERIODO = { hoje: 'Hoje', ontem: 'Ontem', '7': 'Últimos 7 dias', mes: 'Este mês', tudo: 'Todo o histórico', custom: 'Período escolhido' };
+
+function aplicarPeriodo(nome, { recarregar = true } = {}) {
+  state.periodo = nome;
+  try { localStorage.setItem('safe-periodo', nome); } catch {}
+  if (PERIODOS[nome]) {
+    const { start, end } = PERIODOS[nome]();
+    state.filters = { ...state.filters, start, end, months: [] };
+  }
+  if (recarregar) applyFilters();
+}
+
+// Chamado a cada consulta: se o dia virou e estamos em "Hoje", o recorte anda
+// junto sem ninguém precisar recarregar a página.
+function viradaDoDia() {
+  if (!PERIODOS[state.periodo] || state.periodo === 'tudo') return false;
+  const { start, end } = PERIODOS[state.periodo]();
+  if (state.filters.start === start && state.filters.end === end) return false;
+  state.filters = { ...state.filters, start, end };
+  return true;
+}
+
+function syncPeriodo() {
+  document.querySelectorAll('[data-periodo]').forEach((botao) => {
+    const ativo = botao.dataset.periodo === state.periodo;
+    botao.classList.toggle('active', ativo);
+    botao.setAttribute('aria-pressed', String(ativo));
+  });
+  const f = state.filters;
+  const intervalo = !f.start && !f.end ? 'todo o histórico da planilha'
+    : f.start === f.end ? formatDate(f.start)
+    : `${f.start ? formatDate(f.start) : 'início'} a ${f.end ? formatDate(f.end) : 'hoje'}`;
+  $('period-current').textContent = `${ROTULO_PERIODO[state.periodo] || 'Período escolhido'} · ${intervalo}`;
+}
+
+// Quando o dia está vazio, dizer isso com todas as letras e apontar onde estão
+// os dados, em vez de mostrar uma tela zerada que parece defeito.
+function avisoDeVazio() {
+  const total = ['inspections', 'dds', 'pending', 'absences'].reduce((soma, tipo) => soma + state.filtered[tipo].length, 0);
+  if (total || !state.data) return '';
+  const datas = flattenRecords(state.data).map((r) => r.recordDate).filter(Boolean).sort();
+  const ultima = datas[datas.length - 1];
+  if (state.periodo === 'tudo') return 'A planilha ainda não tem lançamentos nas abas de dados.';
+  return `Nenhum lançamento neste período.${ultima ? ` O lançamento mais recente da planilha é de ${formatDate(ultima)} — use os botões de período acima para vê-lo.` : ' A planilha ainda não tem lançamentos com data.'}`;
+}
+
+function applyFilters() { state.page = 1; state.filters = validateFilters(state.filters); syncControls(); syncPeriodo(); persist(); render(); }
 function render() {
   if (!state.data) return;
   state.filtered = filterData(state.data, state.filters);
@@ -42,7 +97,8 @@ function render() {
   $('metric-dds-note').textContent = `${m.participants} participações informadas${unknownParticipants ? ` · ${unknownParticipants} registro(s) sem quantidade` : ''}`;
   $('metric-absence').textContent = m.absenceDays;
   $('metric-absence-note').textContent = `${m.interviews} entrevistas · data da entrevista`;
-  $('active-filters').textContent = filterDescription(state.filters);
+  const aviso = avisoDeVazio();
+  $('active-filters').innerHTML = `${e(filterDescription(state.filters))}${aviso ? `<span class="empty-hint">${e(aviso)}</span>` : ''}`;
   renderTrend(); renderStatus(); renderSectors(); renderDaily(); renderSummary(); renderTable();
 }
 // Indicativo diário: rotina do dia, sem histórico. Não entra nos gráficos por mês.
@@ -50,9 +106,15 @@ function renderDaily() {
   const daily = state.data.daily || { items: [] }, items = daily.items || [];
   const done = items.filter(r => r.done).length;
   $('daily-count').textContent = items.length ? `${done} de ${items.length} com status` : '0 atividades';
-  $('daily-meta').textContent = items.length
-    ? [daily.date && `Data: ${daily.date}`, daily.owner && `Responsável: ${daily.owner}`, 'Preenchimento na aba Indicativo Diário'].filter(Boolean).join(' · ')
-    : 'A aba Indicativo Diário ainda não tem atividades preenchidas.';
+  // Essa aba é um formulário do dia: quem olha precisa saber de que dia ela é.
+  const hoje = dayKeyInSaoPaulo(0);
+  const doDia = daily.date && toDateKey(daily.date) === hoje;
+  const aviso = !items.length ? 'A aba Indicativo Diário ainda não tem atividades preenchidas.'
+    : !daily.date ? 'Atenção: o campo Data da aba Indicativo Diário está em branco na planilha, então não dá para saber a que dia esta rotina se refere.'
+    : doDia ? `Rotina de hoje, ${formatDate(daily.date)}.`
+    : `Atenção: esta rotina é de ${formatDate(daily.date)}, não de hoje (${formatDate(hoje)}).`;
+  $('daily-meta').textContent = [aviso, daily.owner && `Responsável: ${daily.owner}`].filter(Boolean).join(' · ');
+  $('daily-panel').classList.toggle('stale', Boolean(items.length) && !doDia);
   $('daily-list').innerHTML = items.length ? items.map(r => `<div class="daily-item${r.done ? ' done' : ''}"><span class="daily-time">${e(r.time || '—')}<small>${e(r.period || '')}</small></span><span class="daily-main"><strong>${e(r.activity)}</strong>${r.detail ? `<small>${e(r.detail)}</small>` : ''}${r.notes ? `<small class="daily-note">Obs.: ${e(r.notes)}</small>` : ''}</span><span class="daily-side">${r.sector ? `<span class="daily-sector">${e(r.sector)}</span>` : ''}<span class="status-chip ${r.done ? 'resolved' : 'open'}">${r.status ? e(r.status) : 'Sem status'}</span></span></div>`).join('') : '<div class="chart-empty">Sem atividades registradas no indicativo diário.</div>';
 }
 // Resumo mensal: os valores são digitados na planilha, não calculados aqui.
@@ -91,6 +153,15 @@ function renderSectors() {
   const entries = Object.entries(groups).sort((a,b) => b[1]-a[1]), max = Math.max(1,...Object.values(groups));
   $('sector-chart').innerHTML = entries.length ? entries.map(([sector,count]) => `<button class="sector-row" type="button" data-sector="${e(sector)}" title="Filtrar ${e(sector)}"><span>${e(sector)}</span><span class="bar-track"><i style="width:${count/max*100}%"></i></span><strong>${count}</strong></button>`).join('') : '<div class="chart-empty">Sem inspeções neste recorte.</div>';
 }
+// Nenhuma coluna preenchida da planilha fica fora do explorador.
+function extras(r) {
+  return [
+    r.owner && `Responsável: ${r.owner}`,
+    r.completedAt && `Concluída em: ${r.completedAt}`,
+    r.evidence && `Evidência: ${r.evidence}`,
+    r.notes && `Obs.: ${r.notes}`,
+  ].filter(Boolean);
+}
 function renderTable() {
   const rows = sortRecords(flattenRecords(state.filtered).filter(r => state.source === 'all' || state.source === r.type), state.sort);
   const pages = Math.max(1, Math.ceil(rows.length/12)); state.page = Math.min(state.page,pages);
@@ -101,27 +172,55 @@ function renderTable() {
   $('actions-table').innerHTML = rows.slice((state.page-1)*12,state.page*12).map(r => {
     const action = ['pending','inspections'].includes(r.type), status = statusBucket(r.status), priority = priorityBucket(r.priority);
     const description = r.condition || r.description || r.topic || (r.type === 'absences' ? `${r.days} dia(s) de ausência · ${r.notified ? 'comunicada' : 'não comunicada'}` : 'Descrição não informada');
-    return `<tr><td>${formatDate(r.recordDate)}<small class="cell-note">${TYPE_LABELS[r.type]}</small></td><td>${e(r.sector || 'Não informado')}</td><td class="description-cell"><strong>${e(r.item || '')}</strong>${e(description)}${r.action ? `<small class="cell-note">Ação: ${e(r.action)}</small>` : ''}${r.type === 'dds' ? `<small class="cell-note">${r.participants ?? 'Quantidade não informada'}${r.participants === null ? '' : ' participações'} · ${e(r.shift || 'Turno não informado')}</small>` : ''}</td><td>${action ? formatDate(r.due) : '—'}${isOverdue(r) ? '<small class="overdue-label">Vencido</small>' : ''}</td><td>${action ? `<span class="status-chip ${priority}">${PRIORITY_LABELS[priority]}</span>` : '—'}</td><td>${action ? `<span class="status-chip ${status}">${r.status ? e(r.status) : 'Não informado'}</span>` : r.type === 'dds' ? (r.registered ? 'Registrado' : 'Não registrado') : 'Sem dados pessoais'}</td></tr>`;
+    return `<tr><td>${formatDate(r.recordDate)}<small class="cell-note">${TYPE_LABELS[r.type]}</small></td><td>${e(r.sector || 'Não informado')}</td><td class="description-cell"><strong>${e(r.item || '')}</strong>${e(description)}${r.action ? `<small class="cell-note">Ação: ${e(r.action)}</small>` : ''}${r.type === 'dds' ? `<small class="cell-note">${r.participants ?? (r.participantsLabel ? e(r.participantsLabel) : 'Quantidade não informada')}${r.participants === null ? '' : ' participações'} · ${e(r.shift || 'Turno não informado')}</small>` : ''}${extras(r).map(x => `<small class="cell-note">${e(x)}</small>`).join('')}</td><td>${action ? formatDate(r.due) : '—'}${isOverdue(r) ? '<small class="overdue-label">Vencido</small>' : ''}</td><td>${action ? `<span class="status-chip ${priority}">${PRIORITY_LABELS[priority]}</span>` : '—'}</td><td>${action ? `<span class="status-chip ${status}">${r.status ? e(r.status) : 'Não informado'}</span>` : r.type === 'dds' ? (r.registered ? 'Registrado' : 'Não registrado') : 'Sem dados pessoais'}</td></tr>`;
   }).join('');
 }
 function live(text, kind='') { $('live-state').className = `live-state ${kind}`; $('live-state').innerHTML = `<span></span>${e(text)}`; }
-function schedule() { clearTimeout(state.timer); if (!demo && !state.paused && !document.hidden) state.timer = setTimeout(load, Math.min(120000,15000 * 2 ** state.failures)); }
-async function load() {
-  if (state.busy) return; state.busy=true; $('refresh-button').disabled=true;
+// Fonte única da verdade da barra de estado e do botão Pausar. Tudo que muda
+// state.paused ou state.failures chama isto, então a tela nunca fica
+// descrevendo um estado diferente do que o programa está realmente fazendo.
+function syncLive() {
+  const botao = $('pause-button');
+  botao.textContent = state.paused ? 'Retomar' : 'Pausar';
+  botao.setAttribute('aria-pressed', String(state.paused));
+  botao.classList.toggle('active', state.paused);
+  if (demo) return live('Demonstração');
+  if (state.paused) return live('Pausado · atualização automática desligada', 'paused');
+  if (state.failures) return live('Sem sincronização', 'error');
+  live('Sincronização ativa', 'ready');
+}
+function schedule() { clearTimeout(state.timer); if (!demo && !state.paused && !document.hidden) state.timer = setTimeout(() => load(), Math.min(120000,15000 * 2 ** state.failures)); }
+// manual = clique no botão Atualizar. Nesse caso a tela avisa o que aconteceu,
+// inclusive quando a resposta é "nada mudou" — senão o botão parece morto.
+async function load(manual = false) {
+  if (state.busy) { if (manual) $('last-update').textContent = 'Já existe uma consulta em andamento...'; return; }
+  state.busy = true;
+  $('refresh-button').disabled = true;
+  if (manual) { $('refresh-label').textContent = 'Atualizando...'; $('last-update').textContent = 'Consultando a planilha...'; }
+  const anterior = state.data?.revision || '';
   try {
     const response = await fetch(demo ? '/data/demo-data.json' : '/api/dados', { headers: state.etag ? { 'If-None-Match': state.etag } : {}, cache:'no-cache', signal:AbortSignal.timeout(14000) });
+    let novidade = false;
     if (response.status !== 304) {
       const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Não foi possível sincronizar.');
+      novidade = Boolean(anterior) && data.revision !== anterior;
       state.data = data; state.etag = response.headers.get('etag') || ''; populateOptions(); render();
     }
     state.failures=0;
+    // Passou da meia-noite com a página aberta? O recorte anda para o novo dia.
+    if (viradaDoDia()) { applyFilters(); }
     $('data-status').textContent = demo ? 'DEMONSTRAÇÃO · dados fictícios, não são os registros da sua planilha.' : state.data.message;
-    $('last-update').textContent = `Verificado às ${new Date().toLocaleTimeString('pt-BR')}`;
-    live(demo ? 'Demonstração' : state.paused ? 'Pausado' : 'Sincronização ativa', demo ? '' : 'ready');
+    const hora = new Date().toLocaleTimeString('pt-BR');
+    $('last-update').textContent = manual
+      ? (novidade ? `Atualizado às ${hora} · dados novos carregados da planilha` : `Atualizado às ${hora} · nenhuma alteração nova na planilha`)
+      : `Verificado às ${hora}${novidade ? ' · dados novos' : ''}`;
+    syncLive();
   } catch (error) {
-    state.failures=Math.min(state.failures+1,3); live('Sem sincronização','error');
+    state.failures=Math.min(state.failures+1,3);
+    syncLive();
     $('data-status').textContent = `${state.data ? 'Exibindo a última leitura, que pode estar desatualizada. ' : ''}${error.name === 'TimeoutError' ? 'A conexão demorou. Nova tentativa automática.' : error.message}`;
-  } finally { state.busy=false; $('refresh-button').disabled=false; schedule(); }
+    if (manual) $('last-update').textContent = 'A atualização falhou. A última leitura continua na tela.';
+  } finally { state.busy=false; $('refresh-button').disabled=false; $('refresh-label').textContent = 'Atualizar'; schedule(); }
 }
 function addMessage(text, kind='system') { const node=document.createElement('div'); node.className=`message ${kind}`; node.textContent=text; $('assistant-messages').append(node); node.scrollIntoView({ block:'nearest' }); }
 function organize(actions) {
@@ -162,23 +261,45 @@ async function ask(event) {
 }
 for (const key of Object.keys(emptyFilters()).filter(k => k !== 'months')) {
   const input=$(`filter-${key}`); let debounce;
-  input?.addEventListener(key==='search'?'input':'change',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{state.filters[key]=input.type==='checkbox'?input.checked:input.value;applyFilters();},key==='search'?200:0);});
+  input?.addEventListener(key==='search'?'input':'change',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{state.filters[key]=input.type==='checkbox'?input.checked:input.value;
+    // Mexeu em De/Até na mão: o painel para de seguir "Hoje" e respeita a escolha.
+    if (key==='start'||key==='end') { state.periodo='custom'; try { localStorage.setItem('safe-periodo','custom'); } catch {} }
+    applyFilters();},key==='search'?200:0);});
 }
-$('month-options').addEventListener('change',event=>{if(event.target.type!=='checkbox')return;const set=new Set(state.filters.months);event.target.checked?set.add(event.target.value):set.delete(event.target.value);state.filters.months=[...set];applyFilters();});
+$('month-options').addEventListener('change',event=>{if(event.target.type!=='checkbox')return;const set=new Set(state.filters.months);event.target.checked?set.add(event.target.value):set.delete(event.target.value);state.filters.months=[...set];
+  // Escolher meses é um recorte próprio: sai do modo "Hoje" e limpa De/Até.
+  state.filters.start='';state.filters.end='';state.periodo='custom';try{localStorage.setItem('safe-periodo','custom');}catch{}
+  applyFilters();});
 $('month-options').addEventListener('click',event=>{const type=event.target.dataset.months;if(!type)return;state.filters.months=type==='all'?[]:(state.data.months || []).slice(-1);applyFilters();});
-$('clear-filters').addEventListener('click',()=>{state.filters=emptyFilters();state.source='all';applyFilters();});
+$('clear-filters').addEventListener('click',()=>{state.filters=emptyFilters();state.source='all';aplicarPeriodo('hoje');});
+document.querySelectorAll('[data-periodo]').forEach(b=>b.addEventListener('click',()=>aplicarPeriodo(b.dataset.periodo)));
 $('record-sort').addEventListener('change',()=>{state.sort=$('record-sort').value;renderTable();});
 document.querySelectorAll('[data-source]').forEach(b=>b.addEventListener('click',()=>{state.source=b.dataset.source;applyFilters();}));
 $('prev-page').addEventListener('click',()=>{state.page--;renderTable();}); $('next-page').addEventListener('click',()=>{state.page++;renderTable();});
 function chartFilter(event) { const target=event.target.closest('[data-month],[data-status],[data-sector]');if(!target)return;if(target.dataset.month)state.filters.months=[target.dataset.month];if(target.dataset.status)state.filters.status=target.dataset.status;if(target.dataset.sector)state.filters.sector=target.dataset.sector;applyFilters(); }
 for(const id of ['trend-chart','status-key','sector-chart']) $(id).addEventListener('click',chartFilter);
 $('trend-chart').addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();chartFilter(event);}});
-$('refresh-button').addEventListener('click',load);
-$('pause-button').addEventListener('click',()=>{state.paused=!state.paused;$('pause-button').textContent=state.paused?'Retomar':'Pausar';$('pause-button').setAttribute('aria-pressed',String(state.paused));live(state.paused?'Pausado':'Sincronização ativa');schedule();if(!state.paused)load();});
+$('refresh-button').addEventListener('click',()=>load(true));
+$('pause-button').addEventListener('click',()=>{
+  state.paused=!state.paused;
+  try { localStorage.setItem('safe-pausado', state.paused ? '1' : '0'); } catch {}
+  syncLive();
+  $('last-update').textContent = state.paused
+    ? 'Atualização automática pausada. O botão Atualizar continua funcionando.'
+    : 'Atualização automática retomada, a cada 15 segundos.';
+  schedule();
+  if(!state.paused)load(true);
+});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!state.paused)load();else clearTimeout(state.timer);}); window.addEventListener('online',()=>{if(!state.paused&&!document.hidden)load();});
 function toggleAssistant(open) { $('assistant-panel').hidden=!open;$('assistant-launcher').hidden=open;$('assistant-launcher').setAttribute('aria-expanded',String(open));if(open)$('assistant-question').focus();else $('assistant-launcher').focus(); }
 $('assistant-launcher').addEventListener('click',()=>toggleAssistant(true));$('assistant-close').addEventListener('click',()=>toggleAssistant(false));
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('assistant-panel').hidden)toggleAssistant(false);});
 $('assistant-form').addEventListener('submit',ask);document.querySelectorAll('[data-command]').forEach(b=>b.addEventListener('click',()=>{$('assistant-question').value=b.dataset.command;$('assistant-form').requestSubmit();}));
 $('undo-ai').addEventListener('click',()=>{if(!state.undo)return;Object.assign(state,{filters:state.undo.filters,source:state.undo.source,sort:state.undo.sort});setTheme(state.undo.theme);populateOptions();applyFilters();state.undo=null;$('undo-ai').hidden=true;addMessage('Visualização anterior restaurada.');});
-syncControls(); load();
+// A escolha de pausar sobrevive ao recarregar a página.
+try { state.paused = localStorage.getItem('safe-pausado') === '1'; } catch {}
+// Padrão do painel: o dia de hoje. A escolha anterior de quem já usou é respeitada.
+try { const salvo = localStorage.getItem('safe-periodo'); if (salvo && (PERIODOS[salvo] || salvo === 'custom')) state.periodo = salvo; } catch {}
+aplicarPeriodo(state.periodo, { recarregar: false });
+state.filters = validateFilters(state.filters);
+syncControls(); syncPeriodo(); syncLive(); load();

@@ -37,7 +37,7 @@
           <div class="month-menu" id="month-options" role="group" aria-label="Filtrar por meses"></div>
         </details>
         <button class="button secondary" id="refresh-button" type="button">
-          <span aria-hidden="true">↻</span> Atualizar
+          <span aria-hidden="true">↻</span> <span id="refresh-label">Atualizar</span>
         </button>
         <button class="button secondary" id="pause-button" type="button" aria-pressed="false">Pausar</button>
       </div>
@@ -45,6 +45,15 @@
 
     <section class="filters-panel" aria-label="Filtros do dashboard">
       <div class="filters-heading"><strong>Explore seus indicadores</strong><button class="text-button" id="clear-filters" type="button">Limpar filtros</button></div>
+      <div class="period-bar" role="group" aria-label="Período em exibição">
+        <span class="period-label">Período</span>
+        <button class="period-button" type="button" data-periodo="hoje">Hoje</button>
+        <button class="period-button" type="button" data-periodo="ontem">Ontem</button>
+        <button class="period-button" type="button" data-periodo="7">Últimos 7 dias</button>
+        <button class="period-button" type="button" data-periodo="mes">Este mês</button>
+        <button class="period-button" type="button" data-periodo="tudo">Tudo</button>
+        <span class="period-current" id="period-current" aria-live="polite"></span>
+      </div>
       <div class="filter-grid">
         <label>Setor<select id="filter-sector"><option value="">Todos os setores</option></select></label>
         <label>Status<select id="filter-status"><option value="">Todos os status</option><option value="open">Em aberto</option><option value="progress">Em andamento</option><option value="resolved">Resolvida</option><option value="cancelled">Cancelada</option></select></label>

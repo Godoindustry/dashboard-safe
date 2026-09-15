@@ -54,12 +54,11 @@ function mapInspection(row, detail) {
     due: pick(source, "Prazo", "Data limite", "Vencimento"),
     status: pick(source, "Status", "Situação"),
     priority: pick(source, "Prioridade", "Criticidade"),
+    // Colunas que antes so iam para o relatorio. O painel mostra a aba inteira.
+    owner: pick(source, "Responsável", "Responsavel"),
+    evidence: pick(source, "Foto/Evidência", "Evidência", "Foto"),
+    notes: pick(source, "Observações", "Observacao"),
   };
-  if (detail === "report") {
-    mapped.owner = pick(source, "Responsável", "Responsavel");
-    mapped.evidence = pick(source, "Foto/Evidência", "Evidência", "Foto");
-    mapped.notes = pick(source, "Observações", "Observacao");
-  }
   return mapped;
 }
 
@@ -72,9 +71,13 @@ function mapDds(row, detail) {
     sector: pick(source, "Setor", "Área"),
     shift: pick(source, "Turno"),
     participants: participantCount(pick(source, "Participantes", "Quantidade de participantes", "Qtd participantes")),
+    // O texto original da coluna Participantes, para nada se perder quando a
+    // celula nao for um numero (por exemplo "Colaboradores").
+    participantsLabel: String(pick(source, "Participantes", "Quantidade de participantes", "Qtd participantes") || "").trim(),
     registered: asBoolean(pick(source, "Registro realizado?", "Registro realizado", "Registrado")),
+    owner: pick(source, "Responsável", "Responsavel"),
+    notes: pick(source, "Observações"),
   };
-  if (detail === "report") mapped.notes = pick(source, "Observações");
   return mapped;
 }
 
@@ -106,12 +109,10 @@ function mapPending(row, detail) {
     status: pick(source, "Status", "Situação"),
     origin: pick(source, "Origem", "Tipo"),
     completedAt: pick(source, "Data de conclusão", "Conclusão"),
+    owner: pick(source, "Responsável", "Responsavel"),
+    evidence: pick(source, "Evidência", "Evidencia", "Foto/Evidência"),
+    notes: pick(source, "Observações"),
   };
-  if (detail === "report") {
-    mapped.owner = pick(source, "Responsável", "Responsavel");
-    mapped.evidence = pick(source, "Evidência", "Evidencia", "Foto/Evidência");
-    mapped.notes = pick(source, "Observações");
-  }
   return mapped;
 }
 

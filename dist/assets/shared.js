@@ -65,6 +65,20 @@ export function formatDate(value) {
   return date ? new Intl.DateTimeFormat("pt-BR").format(date) : "-";
 }
 
+// O dia do painel é sempre o dia de São Paulo, não o do relógio de quem abre.
+// Assim a virada da meia-noite é a mesma para a fábrica e para quem vê de fora.
+export function dayKeyInSaoPaulo(offsetDays = 0, now = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(now).map((part) => [part.type, part.value]));
+  const base = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
+  base.setUTCDate(base.getUTCDate() + offsetDays);
+  return base.toISOString().slice(0, 10);
+}
+
+export function monthStartInSaoPaulo(now = new Date()) {
+  return `${dayKeyInSaoPaulo(0, now).slice(0, 8)}01`;
+}
+
 export function statusBucket(value) {
   const status = normalizeText(value);
   if (/cancelad|nao aplic/.test(status)) return "cancelled";
