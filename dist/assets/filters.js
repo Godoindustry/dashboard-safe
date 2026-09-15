@@ -1,6 +1,9 @@
 import { normalizeText, recordMonth, toDateKey, statusBucket, priorityBucket, isOverdue } from './shared.js';
 export const TYPES = ['inspections', 'pending', 'dds', 'absences'];
-export const TYPE_LABELS = { inspections: 'Inspeções', pending: 'Pendências', dds: 'DDS', absences: 'Absenteísmo' };
+// TYPES governa o filtro e o relatório. As três abas abaixo têm formato próprio
+// (EPI, a rotina do dia e o consolidado) e entram só no explorador, por isso
+// ficam fora de TYPES mas precisam de rótulo.
+export const TYPE_LABELS = { inspections: 'Inspeções', pending: 'Pendências', dds: 'DDS', absences: 'Absenteísmo', epi: 'Inspeção de EPI', daily: 'Indicativo Diário', summary: 'Resumo Mensal' };
 export const STATUS_LABELS = { open: 'Em aberto', progress: 'Em andamento', resolved: 'Resolvida', cancelled: 'Cancelada' };
 export const PRIORITY_LABELS = { critical: 'Crítica', high: 'Alta', medium: 'Média', low: 'Baixa', unknown: 'Não informada' };
 export function emptyFilters() { return { months: [], sector: '', status: '', priority: '', search: '', start: '', end: '', overdue: false, shift: '', registered: '' }; }

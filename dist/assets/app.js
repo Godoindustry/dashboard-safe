@@ -201,17 +201,41 @@ function extras(r) {
     r.notes && `Obs.: ${r.notes}`,
   ].filter(Boolean);
 }
+// As abas de formato próprio entram no explorador junto com as outras.
+// EPI segue o período escolhido, porque tem data por linha. A rotina do dia e o
+// consolidado não têm data por linha na planilha, então aparecem sempre, com o
+// aviso "Sem data na planilha" em vez de sumirem do recorte.
+function registrosDasAbasProprias() {
+  const f = state.filters;
+  const dentroDoPeriodo = (dia) => {
+    if (f.start && (!dia || dia < f.start)) return false;
+    if (f.end && (!dia || dia > f.end)) return false;
+    return true;
+  };
+  const epi = (state.data.epi || [])
+    .filter(r => dentroDoPeriodo(toDateKey(r.date)))
+    .filter(r => !f.sector || normalizeText(r.sector || '').includes(normalizeText(f.sector)))
+    .map((r, i) => ({ ...r, type: 'epi', rowKey: `epi-${i}`, recordDate: toDateKey(r.date) }));
+  const daily = (state.data.daily?.items || [])
+    .map((r, i) => ({ type: 'daily', rowKey: `daily-${i}`, recordDate: toDateKey(state.data.daily.date), sector: r.sector, item: r.time, description: r.activity, action: r.detail, notes: r.notes, status: r.status, owner: state.data.daily.owner, periodoDoDia: r.period }));
+  const summary = (state.data.summary?.items || [])
+    .map((r, i) => ({ type: 'summary', rowKey: `summary-${i}`, recordDate: '', sector: '', description: r.indicator, notes: r.notes, status: r.filled ? r.amount : '' }));
+  return [...epi, ...daily, ...summary];
+}
 function renderTable() {
-  const rows = sortRecords(flattenRecords(state.filtered).filter(r => state.source === 'all' || state.source === r.type), state.sort);
+  const rows = sortRecords([...flattenRecords(state.filtered), ...registrosDasAbasProprias()].filter(r => state.source === 'all' || state.source === r.type), state.sort);
   const pages = Math.max(1, Math.ceil(rows.length/12)); state.page = Math.min(state.page,pages);
   $('actions-count').textContent = `${rows.length} registros`;
   $('actions-empty').hidden = !!rows.length;
   $('page-info').textContent = `Página ${state.page} de ${pages} · ${rows.length} registros`;
   $('prev-page').disabled = state.page <= 1; $('next-page').disabled = state.page >= pages;
   $('actions-table').innerHTML = rows.slice((state.page-1)*12,state.page*12).map(r => {
-    const action = ['pending','inspections'].includes(r.type), status = statusBucket(r.status), priority = priorityBucket(r.priority);
+    const action = ['pending','inspections','epi'].includes(r.type), status = statusBucket(r.status), priority = priorityBucket(r.priority);
     const description = r.condition || r.description || r.topic || (r.type === 'absences' ? `${r.days} dia(s) de ausência · ${r.notified ? 'comunicada' : 'não comunicada'}` : 'Descrição não informada');
-    return `<tr><td>${formatDate(r.recordDate)}<small class="cell-note">${TYPE_LABELS[r.type]}</small></td><td>${e(r.sector || 'Não informado')}</td><td class="description-cell"><strong>${e(r.item || '')}</strong>${e(description)}${r.action ? `<small class="cell-note">Ação: ${e(r.action)}</small>` : ''}${r.type === 'dds' ? `<small class="cell-note">${r.participants ?? (r.participantsLabel ? e(r.participantsLabel) : 'Quantidade não informada')}${r.participants === null ? '' : ' participações'} · ${e(r.shift || 'Turno não informado')}</small>` : ''}${extras(r).map(x => `<small class="cell-note">${e(x)}</small>`).join('')}</td><td>${action ? formatDate(r.due) : '—'}${isOverdue(r) ? '<small class="overdue-label">Vencido</small>' : ''}</td><td>${action ? `<span class="status-chip ${priority}">${PRIORITY_LABELS[priority]}</span>` : '—'}</td><td>${action ? `<span class="status-chip ${status}">${r.status ? e(r.status) : 'Não informado'}</span>` : r.type === 'dds' ? (r.registered ? 'Registrado' : 'Não registrado') : 'Sem dados pessoais'}</td></tr>`;
+    // Resumo mensal não é registro datado: a última coluna mostra a quantidade.
+    if (r.type === 'summary') return `<tr><td>—<small class="cell-note">${TYPE_LABELS.summary}</small></td><td>—</td><td class="description-cell"><strong>${e(r.description)}</strong>${r.notes ? `<small class="cell-note">${e(r.notes)}</small>` : ''}</td><td>—</td><td>—</td><td>${r.status ? `<span class="status-chip resolved">${e(r.status)}</span>` : 'Não preenchido'}</td></tr>`;
+    const dataDaLinha = r.recordDate ? formatDate(r.recordDate) : (r.type === 'daily' ? 'Sem data' : '—');
+    return `<tr><td>${dataDaLinha}<small class="cell-note">${TYPE_LABELS[r.type]}</small></td><td>${e(r.sector || 'Não informado')}</td><td class="description-cell"><strong>${e(r.item || '')}</strong>${e(description)}${r.action ? `<small class="cell-note">Ação: ${e(r.action)}</small>` : ''}${r.type === 'dds' ? `<small class="cell-note">${r.participants ?? (r.participantsLabel ? e(r.participantsLabel) : 'Quantidade não informada')}${r.participants === null ? '' : ' participações'} · ${e(r.shift || 'Turno não informado')}</small>` : ''}${extras(r).map(x => `<small class="cell-note">${e(x)}</small>`).join('')}</td><td>${action ? formatDate(r.due) : '—'}${isOverdue(r) ? '<small class="overdue-label">Vencido</small>' : ''}</td><td>${action ? `<span class="status-chip ${priority}">${PRIORITY_LABELS[priority]}</span>` : '—'}</td><td>${action ? `<span class="status-chip ${status}">${r.status ? e(r.status) : 'Não informado'}</span>` : r.type === 'dds' ? (r.registered ? 'Registrado' : 'Não registrado') : 'Sem dados pessoais'}</td></tr>`;
   }).join('');
 }
 function live(text, kind='') { $('live-state').className = `live-state ${kind}`; $('live-state').innerHTML = `<span></span>${e(text)}`; }
