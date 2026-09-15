@@ -28,10 +28,10 @@ export function createReportPdf(report) {
   heading('1. OBJETIVO');paragraph(OBJECTIVE);
   heading('2. INDICADORES DO PERÍODO');
   const m=report.metrics;
-  table(['Inspeções','DDS / participações','Dias de ausência','Pendências / resolvidas'],[[m.inspections,`${m.dds} / ${m.participants}`,m.absenceDays,`${m.actions} / ${m.resolved}`]]);
-  paragraph('Pendências são contadas exclusivamente na aba Pendências. Dias de ausência são quantidades informadas, agrupadas pela data da entrevista; não representam uma taxa. DDS conta registros, incluindo agendamentos. Participações somam somente quantidades numéricas informadas.',8);
+  table(['Inspeções','DDS / participações','Dias de absenteísmo','Pendências / resolvidas'],[[m.inspections,`${m.dds} / ${m.participants}`,m.absenceDays,`${m.actions} / ${m.resolved}`]]);
+  paragraph('Pendências são contadas exclusivamente na aba Pendências. Os dias de absenteísmo são quantidades informadas, agrupadas pela data da entrevista; não representam uma taxa. DDS conta registros, incluindo agendamentos. Participações somam somente quantidades numéricas informadas.',8);
   heading('3. REGISTRO DAS CONDIÇÕES OBSERVADAS');
-  if(report.data.inspections.length) table(['Local / data','Condição observada','Risco','Ação corretiva','Prioridade'],report.data.inspections.map(r=>[`${text(r.sector)}\n${formatDate(r.date)}`,text(r.condition || r.item),text(r.risk),text(r.action),text(r.priority)]),{0:{cellWidth:27},1:{cellWidth:46},2:{cellWidth:31},3:{cellWidth:50},4:{cellWidth:26}});
+  if(report.data.inspections.length) table(['Local / data','Condição observada','Situação / risco','Ação corretiva','Prioridade'],report.data.inspections.map(r=>[`${text(r.sector)}\n${formatDate(r.date)}`,text(r.condition || r.item),text(r.conformity || r.risk),text(r.action),text(r.priority)]),{0:{cellWidth:27},1:{cellWidth:46},2:{cellWidth:31},3:{cellWidth:50},4:{cellWidth:26}});
   else paragraph('Nenhuma condição registrada no recorte selecionado. Ausência de registros não significa ausência de riscos.');
   heading('4. ACOMPANHAMENTO DAS PENDÊNCIAS');
   if(report.data.pending.length) table(['Setor / pendência','Ação corretiva','Responsável','Prazo / status'],report.data.pending.map(r=>[`${text(r.sector)}\n${text(r.description)}`,text(r.action),text(r.owner),`${formatDate(r.due)}\n${text(r.status)}`]),{0:{cellWidth:55},1:{cellWidth:60},2:{cellWidth:32},3:{cellWidth:33}});
@@ -39,11 +39,18 @@ export function createReportPdf(report) {
   heading('5. DDS DO PERÍODO');
   if(report.data.dds.length) table(['Data / setor','Tema','Turno','Participações','Registro'],report.data.dds.map(r=>[`${formatDate(r.date)}\n${text(r.sector)}`,text(r.topic),text(r.shift),r.participants ?? 'Não informado',r.registered?'Sim':'Não']));
   else paragraph('Nenhum DDS registrado no recorte selecionado.');
-  heading('6. REFERÊNCIAS DO MODELO — VALIDAR APLICABILIDADE');paragraph(REFERENCES);
-  heading('7. OBSERVAÇÕES FINAIS');paragraph(report.notes || 'Sem observações adicionais.');
+  heading('6. INSPEÇÃO DE EPI');
+  const epi=report.data.epi || [];
+  if(epi.length){
+    table(['Data / setor','Colaborador','Ocorrência','Ação necessária','Responsável / prazo','Status'],epi.map(r=>[`${formatDate(r.date)}\n${text(r.sector)}`,text(r.name),text(r.description),text(r.action),`${text(r.owner)}\n${r.due || ''}`.trim(),text(r.status)]),{0:{cellWidth:24},1:{cellWidth:24},2:{cellWidth:44},3:{cellWidth:44},4:{cellWidth:26},5:{cellWidth:18}});
+    paragraph('Este bloco identifica colaboradores. Trate o documento como restrito e confirme a necessidade antes de distribuir.',8);
+  }
+  else paragraph('Nenhuma ocorrência de uso de EPI registrada no recorte selecionado.');
+  heading('7. REFERÊNCIAS DO MODELO — VALIDAR APLICABILIDADE');paragraph(REFERENCES);
+  heading('8. OBSERVAÇÕES FINAIS');paragraph(report.notes || 'Sem observações adicionais.');
   const photos=Array.isArray(report.photos)?report.photos.filter(p=>p && typeof p.dataUrl==='string' && p.dataUrl.startsWith('data:image/')):[];
   if(photos.length){
-    heading('8. REGISTRO FOTOGRÁFICO');
+    heading('9. REGISTRO FOTOGRÁFICO');
     paragraph('Imagens anexadas pela pessoa responsável. Confirme que nenhuma delas expõe dados pessoais ou informações médicas antes de distribuir o documento.',8);
     photos.forEach((photo,index)=>{
       const ratio=photo.height&&photo.width?photo.height/photo.width:0.75;

@@ -48,12 +48,16 @@ function mapInspection(row, detail) {
     date: pick(source, "Data", "Data inspeção", "Data da inspeção"),
     sector: pick(source, "Setor", "Local", "Área"),
     item: pick(source, "Item verificado", "Item", "Origem"),
-    condition: pick(source, "Situação encontrada", "Condição observada", "Não conformidade", "Pendência"),
+    // "Situação encontra" e "Prioridades" são como a planilha escreve hoje.
+    // Os nomes antigos continuam aceitos para não quebrar planilhas anteriores.
+    condition: pick(source, "Situação encontrada", "Situação encontra", "Condição observada", "Não conformidade", "Pendência"),
     risk: pick(source, "Risco", "Risco observado"),
     action: pick(source, "Ação necessária", "Ação corretiva", "Tratativa"),
     due: pick(source, "Prazo", "Data limite", "Vencimento"),
-    status: pick(source, "Status", "Situação"),
-    priority: pick(source, "Prioridade", "Criticidade"),
+    status: pick(source, "Status", "Situação atual"),
+    priority: pick(source, "Prioridades", "Prioridade", "Criticidade"),
+    // Coluna "Situação": Conforme / Não conforme. É diferente do Status.
+    conformity: pick(source, "Situação", "Conformidade"),
     // Colunas que antes so iam para o relatorio. O painel mostra a aba inteira.
     owner: pick(source, "Responsável", "Responsavel"),
     evidence: pick(source, "Foto/Evidência", "Evidência", "Foto"),
@@ -193,6 +197,36 @@ export function mapDailyIndicator(rows = []) {
   return { owner, date, items };
 }
 
+// Aba "Inspeção de EPI". Formato proprio: a coluna da data nao tem titulo, e o
+// cabecalho comeca em "Nome". Chega em linhas cruas, em array.
+//
+// PRIVACIDADE: a coluna Nome traz o nome do colaborador ligado a uma ocorrencia
+// disciplinar. O painel e publico, entao o nome so vai no detalhe de relatorio,
+// nunca na tela aberta. Mesma regra ja usada no absenteismo.
+export function mapEpiInspections(rows = [], { detail = "public" } = {}) {
+  const table = (rows || []).map((row) => (Array.isArray(row) ? row.map((cell) => String(cell ?? "").replace(/\s+/g, " ").trim()) : []));
+  const headerIndex = table.findIndex((row) => row.some((cell) => normalize(cell) === "nome"));
+  if (headerIndex < 0) return [];
+  const headers = table[headerIndex].map(normalize);
+  const at = (...names) => {
+    for (const name of names) { const index = headers.indexOf(normalize(name)); if (index >= 0) return index; }
+    return -1;
+  };
+  const dateColumn = at("Data") >= 0 ? at("Data") : 0; // coluna da data vem sem titulo
+  const columns = { name: at("Nome"), sector: at("Setor"), description: at("Descrição"), action: at("Ação necessaria", "Ação necessária"), owner: at("Responsável"), due: at("Prazo"), status: at("Status"), notes: at("Observação", "Observações") };
+  const records = [];
+  for (const row of table.slice(headerIndex + 1)) {
+    const value = (key) => (columns[key] >= 0 ? row[columns[key]] || "" : "");
+    const description = value("description");
+    const date = row[dateColumn] || "";
+    if (!description && !date) continue;
+    const record = { date, sector: value("sector"), description, action: value("action"), owner: value("owner"), due: value("due"), status: value("status"), notes: value("notes") };
+    if (detail === "report") record.name = value("name");
+    records.push(record);
+  }
+  return records;
+}
+
 // Aba "Resumo Mensal": titulo na primeira linha, depois o cabecalho
 // Indicador | Quantidade | Observações e as linhas de indicadores.
 // Tambem chega em linhas cruas, em array.
@@ -228,7 +262,7 @@ export function transformWorkbook(raw, { detail = "public" } = {}) {
     ...absences.map((item) => dateMonth(item.interviewDate || item.absenceDate)),
     ...pending.map((item) => dateMonth(item.date)),
   ].filter(Boolean))].sort();
-  return { inspections, dds, absences, pending, months, daily: mapDailyIndicator(raw.daily), summary: mapMonthlySummary(raw.summary) };
+  return { inspections, dds, absences, pending, months, epi: mapEpiInspections(raw.epi, { detail }), daily: mapDailyIndicator(raw.daily), summary: mapMonthlySummary(raw.summary) };
 }
 
 export function containsSensitiveAbsenceFields(payload) {

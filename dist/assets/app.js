@@ -99,7 +99,26 @@ function render() {
   $('metric-absence-note').textContent = `${m.interviews} entrevistas · data da entrevista`;
   const aviso = avisoDeVazio();
   $('active-filters').innerHTML = `${e(filterDescription(state.filters))}${aviso ? `<span class="empty-hint">${e(aviso)}</span>` : ''}`;
-  renderTrend(); renderStatus(); renderSectors(); renderDaily(); renderSummary(); renderTable();
+  renderTrend(); renderStatus(); renderSectors(); renderEpi(); renderDaily(); renderSummary(); renderTable();
+}
+// Inspeção de EPI: acompanha o mesmo período escolhido nos botões acima.
+// O nome do colaborador não entra: o painel é público e a ocorrência é pessoal.
+function renderEpi() {
+  const todos = state.data.epi || [];
+  const f = state.filters;
+  const dentro = todos.filter(r => {
+    const dia = toDateKey(r.date);
+    if (f.start && (!dia || dia < f.start)) return false;
+    if (f.end && (!dia || dia > f.end)) return false;
+    if (f.sector && !normalizeText(r.sector || '').includes(normalizeText(f.sector))) return false;
+    return true;
+  });
+  $('epi-count').textContent = `${dentro.length} ocorrência${dentro.length === 1 ? '' : 's'}`;
+  $('epi-meta').textContent = todos.length
+    ? `Aba Inspeção de EPI · ${todos.length} no total da planilha. O nome do colaborador não aparece aqui porque o painel é público; ele sai no PDF do relatório.`
+    : 'A aba Inspeção de EPI ainda não tem ocorrências preenchidas.';
+  $('epi-list').innerHTML = dentro.length ? dentro.map(r => `<div class="daily-item${statusBucket(r.status) === 'resolved' ? ' done' : ''}"><span class="daily-time">${formatDate(r.date)}<small>${e(r.sector || 'Setor não informado')}</small></span><span class="daily-main"><strong>${e(r.description || 'Sem descrição')}</strong>${r.action ? `<small>Ação: ${e(r.action)}</small>` : ''}${r.notes ? `<small class="daily-note">Obs.: ${e(r.notes)}</small>` : ''}</span><span class="daily-side">${r.owner ? `<span class="daily-sector">${e(r.owner)}</span>` : ''}${r.due ? `<span class="daily-sector">Prazo: ${e(r.due)}</span>` : ''}<span class="status-chip ${statusBucket(r.status)}">${r.status ? e(r.status) : 'Sem status'}</span></span></div>`).join('')
+    : `<div class="chart-empty">${todos.length ? 'Nenhuma ocorrência de EPI neste período.' : 'Sem ocorrências de EPI registradas.'}</div>`;
 }
 // Indicativo diário: rotina do dia, sem histórico. Não entra nos gráficos por mês.
 function renderDaily() {

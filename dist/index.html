@@ -82,7 +82,7 @@
       <article class="metric-card"><span>Inspeções</span><strong id="metric-inspections">0</strong><small id="metric-inspections-note">no período selecionado</small></article>
       <article class="metric-card"><span>Taxa de resolução</span><strong id="metric-resolution">0%</strong><small id="metric-resolution-note">sem ocorrências registradas</small></article>
       <article class="metric-card"><span>Registros de DDS</span><strong id="metric-dds">0</strong><small id="metric-dds-note">Soma das participações informadas</small></article>
-      <article class="metric-card"><span>Dias de ausência</span><strong id="metric-absence">0</strong><small id="metric-absence-note">0 entrevistas</small></article>
+      <article class="metric-card"><span>Dias de absenteísmo</span><strong id="metric-absence">0</strong><small id="metric-absence-note">0 entrevistas</small></article>
     </section>
 
     <section class="dashboard-grid">
@@ -99,6 +99,15 @@
       <article class="panel">
         <div class="panel-heading"><div><p class="eyebrow">Concentração</p><h2>Inspeções por setor</h2></div></div>
         <div class="sector-bars" id="sector-chart"></div>
+      </article>
+
+      <article class="panel panel-wide" id="epi-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Uso de EPI</p><h2>Inspeção de EPI</h2></div>
+          <span class="count-badge" id="epi-count">0 ocorrências</span>
+        </div>
+        <p class="panel-note" id="epi-meta"></p>
+        <div class="daily-list" id="epi-list"></div>
       </article>
 
       <article class="panel panel-wide" id="daily-panel">
@@ -120,7 +129,7 @@
 
       <article class="panel records-panel" id="records-panel">
         <div class="panel-heading"><div><p class="eyebrow">Explorador</p><h2>Todos os registros</h2></div><span class="count-badge" id="actions-count">0 itens</span></div>
-        <div class="records-toolbar"><div class="segmented source-tabs" role="group" aria-label="Tipo de registro"><button data-source="all" class="active" type="button">Todos</button><button data-source="inspections" type="button">Inspeções</button><button data-source="pending" type="button">Pendências</button><button data-source="dds" type="button">DDS</button><button data-source="absences" type="button">Ausências</button></div><label class="sort-label">Ordenar<select id="record-sort"><option value="date-desc">Mais recentes</option><option value="date-asc">Mais antigos</option><option value="due">Prazo mais próximo</option><option value="priority">Maior prioridade</option><option value="sector">Setor A–Z</option></select></label></div>
+        <div class="records-toolbar"><div class="segmented source-tabs" role="group" aria-label="Tipo de registro"><button data-source="all" class="active" type="button">Todos</button><button data-source="inspections" type="button">Inspeções</button><button data-source="pending" type="button">Pendências</button><button data-source="dds" type="button">DDS</button><button data-source="absences" type="button">Absenteísmo</button></div><label class="sort-label">Ordenar<select id="record-sort"><option value="date-desc">Mais recentes</option><option value="date-asc">Mais antigos</option><option value="due">Prazo mais próximo</option><option value="priority">Maior prioridade</option><option value="sector">Setor A–Z</option></select></label></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Data / tipo</th><th>Setor</th><th>Registro / ação</th><th>Prazo</th><th>Prioridade</th><th>Status / registro</th></tr></thead>

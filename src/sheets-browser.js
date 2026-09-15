@@ -20,7 +20,7 @@ const SHEETS = {
 
 // Abas com formato livre: titulo, linha de identificacao e so entao o cabecalho.
 // Sao lidas em linhas cruas (headers=0) e interpretadas em data.mjs.
-const ABAS_LIVRES = { daily: "Indicativo Diário", summary: "Resumo Mensal" };
+const ABAS_LIVRES = { daily: "Indicativo Diário", summary: "Resumo Mensal", epi: "Inspeção de EPI" };
 
 // Tabela gviz em linhas cruas, preservando a ordem das colunas.
 function gvizRows(body) {

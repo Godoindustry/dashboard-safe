@@ -1,6 +1,6 @@
 import { normalizeText, recordMonth, toDateKey, statusBucket, priorityBucket, isOverdue } from './shared.js';
 export const TYPES = ['inspections', 'pending', 'dds', 'absences'];
-export const TYPE_LABELS = { inspections: 'Inspeções', pending: 'Pendências', dds: 'DDS', absences: 'Ausências' };
+export const TYPE_LABELS = { inspections: 'Inspeções', pending: 'Pendências', dds: 'DDS', absences: 'Absenteísmo' };
 export const STATUS_LABELS = { open: 'Em aberto', progress: 'Em andamento', resolved: 'Resolvida', cancelled: 'Cancelada' };
 export const PRIORITY_LABELS = { critical: 'Crítica', high: 'Alta', medium: 'Média', low: 'Baixa', unknown: 'Não informada' };
 export function emptyFilters() { return { months: [], sector: '', status: '', priority: '', search: '', start: '', end: '', overdue: false, shift: '', registered: '' }; }
