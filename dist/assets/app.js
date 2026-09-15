@@ -114,6 +114,8 @@ function renderEpi() {
     return true;
   });
   $('epi-count').textContent = `${dentro.length} ocorrência${dentro.length === 1 ? '' : 's'}`;
+  $('metric-epi').textContent = dentro.length;
+  $('metric-epi-note').textContent = `${todos.length} no total da planilha`;
   $('epi-meta').textContent = todos.length
     ? `Aba Inspeção de EPI · ${todos.length} no total da planilha. O nome do colaborador não aparece aqui porque o painel é público; ele sai no PDF do relatório.`
     : 'A aba Inspeção de EPI ainda não tem ocorrências preenchidas.';
@@ -136,12 +138,30 @@ function renderDaily() {
   $('daily-panel').classList.toggle('stale', Boolean(items.length) && !doDia);
   $('daily-list').innerHTML = items.length ? items.map(r => `<div class="daily-item${r.done ? ' done' : ''}"><span class="daily-time">${e(r.time || '—')}<small>${e(r.period || '')}</small></span><span class="daily-main"><strong>${e(r.activity)}</strong>${r.detail ? `<small>${e(r.detail)}</small>` : ''}${r.notes ? `<small class="daily-note">Obs.: ${e(r.notes)}</small>` : ''}</span><span class="daily-side">${r.sector ? `<span class="daily-sector">${e(r.sector)}</span>` : ''}<span class="status-chip ${r.done ? 'resolved' : 'open'}">${r.status ? e(r.status) : 'Sem status'}</span></span></div>`).join('') : '<div class="chart-empty">Sem atividades registradas no indicativo diário.</div>';
 }
-// Resumo mensal: os valores são digitados na planilha, não calculados aqui.
+// Resumo mensal: o valor da planilha é o que ela digitou. Ao lado, o painel
+// mostra a contagem que ele mesmo faz no período escolhido, para conferência.
+// Só entram contagens diretas dos registros; nada é estimado ou inventado.
+function contagemDoPainel(indicador) {
+  const chave = normalizeText(indicador);
+  const naoConforme = state.filtered.inspections.filter(r => normalizeText(r.conformity).includes('nao conforme'));
+  if (chave.includes('inspecoes realizadas')) return state.filtered.inspections.length;
+  if (chave.includes('dds realizados')) return state.filtered.dds.length;
+  if (chave.includes('entrevistas de absenteismo')) return state.filtered.absences.length;
+  if (chave.includes('nao conformidades resolvidas')) return naoConforme.filter(r => statusBucket(r.status) === 'resolved').length;
+  if (chave.includes('nao conformidades')) return naoConforme.length;
+  if (chave.includes('pendencias em aberto')) return state.filtered.pending.filter(r => statusBucket(r.status) === 'open').length;
+  return null; // "Dias trabalhados registrados" não sai dos registros: não é calculado.
+}
 function renderSummary() {
   const items = state.data.summary?.items || [];
   const filled = items.filter(r => r.filled).length;
   $('summary-count').textContent = items.length ? `${filled} de ${items.length} preenchidos` : '0 indicadores';
-  $('summary-list').innerHTML = items.length ? items.map(r => `<div class="summary-row"><span>${e(r.indicator)}${r.notes ? `<small>${e(r.notes)}</small>` : ''}</span><strong>${r.filled ? e(r.amount) : '—'}</strong></div>`).join('') : '<div class="chart-empty">A aba Resumo Mensal ainda não foi preenchida.</div>';
+  $('summary-list').innerHTML = items.length
+    ? `<div class="summary-row summary-head"><span>Indicador</span><strong>Planilha</strong><b>Painel</b></div>` + items.map(r => {
+        const calculado = contagemDoPainel(r.indicator);
+        return `<div class="summary-row"><span>${e(r.indicator)}${r.notes ? `<small>${e(r.notes)}</small>` : ''}</span><strong>${r.filled ? e(r.amount) : '—'}</strong><b>${calculado === null ? '—' : calculado}</b></div>`;
+      }).join('')
+    : '<div class="chart-empty">A aba Resumo Mensal ainda não foi preenchida.</div>';
 }
 function renderTrend() {
   const colors = [COLORS.blue, COLORS.cyan, COLORS.yellow];

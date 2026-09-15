@@ -395,3 +395,10 @@ select { width: 100%; min-height: 44px; font: inherit; padding: .65rem .6rem; bo
 .empty-hint { display: block; margin-top: .4rem; font-weight: 600; color: var(--heading); }
 #daily-panel.stale { border-color: var(--yellow-500, #f5b82e); }
 @media(max-width:620px) { .period-current { margin-left: 0; width: 100%; } }
+
+/* Resumo mensal: valor da planilha ao lado da contagem do painel */
+.summary-row { display: grid; grid-template-columns: 1fr auto auto; gap: .9rem; align-items: baseline; }
+.summary-row strong, .summary-row b { min-width: 3.2rem; text-align: right; font-variant-numeric: tabular-nums; }
+.summary-row b { font-size: 1.05rem; color: var(--blue-600, #2878b5); }
+.summary-head { font-size: .68rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); }
+.summary-head strong, .summary-head b { font-size: .68rem; color: var(--muted); font-weight: 700; }
