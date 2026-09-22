@@ -25,13 +25,18 @@
     <div class="header-actions"><button class="button ghost" id="theme-toggle" type="button">◐ Modo escuro</button><div class="live-state" id="live-state"><span></span> Conectando</div></div>
   </header>
 
-  <main id="conteudo" class="shell">
-    <section class="page-heading" aria-labelledby="titulo-dashboard">
-      <div>
-        <p class="eyebrow">Visão operacional</p>
-        <h1 id="titulo-dashboard">Indicadores de segurança</h1>
+  <main id="conteudo" class="shell plan-shell">
+    <section class="plan-hero" aria-labelledby="titulo-dashboard">
+      <div class="hero-copy">
+        <p class="hero-kicker">Plano de atuação</p>
+        <h1 id="titulo-dashboard">Segurança do Trabalho <span>— SAFE</span></h1>
+        <p>Ações estruturadas para um ambiente de trabalho mais seguro, saudável e produtivo.</p>
       </div>
-      <div class="toolbar">
+      <div class="hero-signature" aria-label="Compromisso SAFE">
+        <strong>SAFE</strong>
+        <span>Segurança hoje.<br>Continuidade sempre.</span>
+      </div>
+      <div class="toolbar hero-toolbar">
         <details class="month-filter" id="month-filter">
           <summary id="month-summary">Todos os meses</summary>
           <div class="month-menu" id="month-options" role="group" aria-label="Filtrar por meses"></div>
@@ -43,50 +48,123 @@
       </div>
     </section>
 
-    <section class="filters-panel" aria-label="Filtros do dashboard">
-      <div class="filters-heading"><strong>Explore seus indicadores</strong><button class="text-button" id="clear-filters" type="button">Limpar filtros</button></div>
-      <div class="period-bar" role="group" aria-label="Período em exibição">
-        <span class="period-label">Período</span>
-        <button class="period-button" type="button" data-periodo="hoje">Hoje</button>
-        <button class="period-button" type="button" data-periodo="ontem">Ontem</button>
-        <button class="period-button" type="button" data-periodo="7">Últimos 7 dias</button>
-        <button class="period-button" type="button" data-periodo="mes">Este mês</button>
-        <button class="period-button" type="button" data-periodo="tudo">Tudo</button>
-        <span class="period-current" id="period-current" aria-live="polite"></span>
+    <details class="filters-panel filters-drawer" aria-label="Filtros do dashboard">
+      <summary class="filters-disclosure">
+        <span><strong>Período e filtros</strong><small>Refine os dados exibidos em todas as frentes</small></span>
+        <span class="filters-current" id="period-current" aria-live="polite"></span>
+      </summary>
+      <div class="filters-content">
+        <div class="filters-heading"><strong>Explore seus indicadores</strong><button class="text-button" id="clear-filters" type="button">Limpar filtros</button></div>
+        <div class="period-bar" role="group" aria-label="Período em exibição">
+          <span class="period-label">Período</span>
+          <button class="period-button" type="button" data-periodo="hoje">Hoje</button>
+          <button class="period-button" type="button" data-periodo="ontem">Ontem</button>
+          <button class="period-button" type="button" data-periodo="7">Últimos 7 dias</button>
+          <button class="period-button" type="button" data-periodo="mes">Este mês</button>
+          <button class="period-button" type="button" data-periodo="tudo">Tudo</button>
+        </div>
+        <div class="filter-grid">
+          <label>Setor<select id="filter-sector"><option value="">Todos os setores</option></select></label>
+          <label>Status<select id="filter-status"><option value="">Todos os status</option><option value="open">Em aberto</option><option value="progress">Em andamento</option><option value="resolved">Resolvida</option><option value="cancelled">Cancelada</option></select></label>
+          <label>Prioridade<select id="filter-priority"><option value="">Todas</option><option value="critical">Crítica</option><option value="high">Alta</option><option value="medium">Média</option><option value="low">Baixa</option><option value="unknown">Não informada</option></select></label>
+          <label>De<input id="filter-start" type="date"></label><label>Até<input id="filter-end" type="date"></label>
+          <label>Buscar nos registros<input id="filter-search" type="search" maxlength="160" placeholder="Máquina, tema, condição..."></label>
+        </div>
+        <details class="advanced-filters"><summary>Mais filtros: turno, registro do DDS e prazo</summary><div class="filter-grid compact-grid"><label>Turno do DDS<select id="filter-shift"><option value="">Todos os turnos</option></select></label><label>DDS registrado<select id="filter-registered"><option value="">Todos</option><option value="yes">Sim</option><option value="no">Não</option></select></label><label class="check-label"><input id="filter-overdue" type="checkbox">Somente prazos vencidos</label></div></details>
+        <p class="filter-note">Todos os indicadores acompanham os filtros. Status, prioridade e prazo se aplicam a inspeções e pendências; turno e registro, somente a DDS.</p>
+        <div id="active-filters" class="active-filters" aria-live="polite"></div>
       </div>
-      <div class="filter-grid">
-        <label>Setor<select id="filter-sector"><option value="">Todos os setores</option></select></label>
-        <label>Status<select id="filter-status"><option value="">Todos os status</option><option value="open">Em aberto</option><option value="progress">Em andamento</option><option value="resolved">Resolvida</option><option value="cancelled">Cancelada</option></select></label>
-        <label>Prioridade<select id="filter-priority"><option value="">Todas</option><option value="critical">Crítica</option><option value="high">Alta</option><option value="medium">Média</option><option value="low">Baixa</option><option value="unknown">Não informada</option></select></label>
-        <label>De<input id="filter-start" type="date"></label><label>Até<input id="filter-end" type="date"></label>
-        <label>Buscar nos registros<input id="filter-search" type="search" maxlength="160" placeholder="Máquina, tema, condição..."></label>
-      </div>
-      <details class="advanced-filters"><summary>Mais filtros: turno, registro do DDS e prazo</summary><div class="filter-grid compact-grid"><label>Turno do DDS<select id="filter-shift"><option value="">Todos os turnos</option></select></label><label>DDS registrado<select id="filter-registered"><option value="">Todos</option><option value="yes">Sim</option><option value="no">Não</option></select></label><label class="check-label"><input id="filter-overdue" type="checkbox">Somente prazos vencidos</label></div></details>
-      <p class="filter-note">Todos os gráficos acompanham os filtros. Status, prioridade e prazo se aplicam a inspeções e pendências; turno e registro, somente a DDS. Outros tipos ficam fora desse recorte.</p>
-      <div id="active-filters" class="active-filters" aria-live="polite"></div>
-    </section>
+    </details>
 
-    <div class="status-line" aria-live="polite">
+    <div class="status-line plan-status" aria-live="polite">
       <span id="data-status">Carregando dados da planilha...</span>
       <span id="last-update"></span>
     </div>
 
-    <section class="risk-rail" aria-label="Situação das pendências">
-      <div><span class="rail-dot critical"></span><strong id="rail-critical">0</strong><small>Críticas ou altas em aberto</small></div>
-      <div><span class="rail-dot attention"></span><strong id="rail-overdue">0</strong><small>Prazos vencidos</small></div>
-      <div><span class="rail-dot progress"></span><strong id="rail-progress">0</strong><small>Em andamento</small></div>
-      <div><span class="rail-dot resolved"></span><strong id="rail-resolved">0</strong><small>Resolvidas</small></div>
+    <section class="fronts-section" aria-labelledby="fronts-title">
+      <div class="fronts-intro">
+        <div><p class="eyebrow">Plano operacional</p><h2 id="fronts-title">Frentes de atuação</h2></div>
+        <p>Selecione uma frente para visualizar o escopo completo, os indicadores e todos os registros relacionados.</p>
+      </div>
+      <div class="front-table-head" aria-hidden="true"><span>Frente</span><span>O que desenvolver</span><span>Periodicidade</span></div>
+      <div class="fronts-list">
+        <details class="front-item" data-front="safety">
+          <summary><span class="front-icon" aria-hidden="true">⌕</span><strong>Inspeção de Segurança</strong><span class="front-description">Inspeção geral da fábrica, máquinas, docas, circulação, elétrica, organização e EPCs.</span><span class="front-period">▣ <b>Quinzenal</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-safety"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+        <details class="front-item" data-front="actions">
+          <summary><span class="front-icon" aria-hidden="true">☑</span><strong>Plano de Ação</strong><span class="front-description">Registrar não conformidade, foto, ação, responsável, prazo e status.</span><span class="front-period">↻ <b>A cada visita</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-actions"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+        <details class="front-item" data-front="machines">
+          <summary><span class="front-icon" aria-hidden="true">⚙</span><strong>Máquinas/Injetoras</strong><span class="front-description">Acompanhar proteções, intertravamentos, acessos e ações da manutenção.</span><span class="front-period">∞ <b>Contínuo</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-machines"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+        <details class="front-item" data-front="cipa">
+          <summary><span class="front-icon" aria-hidden="true">♟</span><strong>CIPA</strong><span class="front-description">Reuniões, inspeções, participação nos planos de ação e campanhas.</span><span class="front-period">▣ <b>Mensal</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-cipa"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+        <details class="front-item" data-front="brigade">
+          <summary><span class="front-icon" aria-hidden="true">♨</span><strong>Brigada</strong><span class="front-description">Inspeções, primeiros socorros, abandono, simulados e emergência.</span><span class="front-period">▣ <b>Cronograma anual</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-brigade"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+        <details class="front-item" data-front="training">
+          <summary><span class="front-icon" aria-hidden="true">♙</span><strong>Treinamentos/DDS</strong><span class="front-description">Temas direcionados aos riscos encontrados nas inspeções.</span><span class="front-period">▣ <b>Mensal/quinzenal</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-training"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+        <details class="front-item" data-front="epi">
+          <summary><span class="front-icon" aria-hidden="true">⌂</span><strong>EPI</strong><span class="front-description">Uso, adequação, CA, entrega, conservação e fiscalização.</span><span class="front-period">∞ <b>Contínuo</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-epi"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+        <details class="front-item" data-front="forklifts">
+          <summary><span class="front-icon" aria-hidden="true">▣</span><strong>Empilhadeiras</strong><span class="front-description">Operadores, checklist, circulação, pedestres e troca de cilindro.</span><span class="front-period">▣ <b>Mensal</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-forklifts"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+        <details class="front-item" data-front="ergonomics">
+          <summary><span class="front-icon" aria-hidden="true">♿</span><strong>Ergonomia</strong><span class="front-description">Postos, movimentação manual, postura, pausas e melhorias.</span><span class="front-period">▥ <b>Por setor</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-ergonomics"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+        <details class="front-item" data-front="contractors">
+          <summary><span class="front-icon" aria-hidden="true">◇</span><strong>Terceiros</strong><span class="front-description">Integração, documentação, APR/PT e acompanhamento de atividades críticas.</span><span class="front-period">▤ <b>Antes do serviço</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-contractors"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+        <details class="front-item" data-front="emergencies">
+          <summary><span class="front-icon" aria-hidden="true">⚠</span><strong>Emergências</strong><span class="front-description">Extintores, hidrantes, rotas, brigada, produtos químicos e simulados.</span><span class="front-period">▣ <b>Mensal</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-emergencies"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+        <details class="front-item" data-front="documents">
+          <summary><span class="front-icon" aria-hidden="true">▤</span><strong>Documentação SST</strong><span class="front-description">PGR, PCMSO, LTCAT, inventários, treinamentos, fichas e registros.</span><span class="front-period">▤ <b>Controle permanente</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="front-body" id="front-body-documents"><div class="front-loading">Carregando indicadores da frente…</div></div>
+        </details>
+      </div>
     </section>
 
-    <section class="metric-grid" aria-label="Indicadores principais">
-      <article class="metric-card"><span>Inspeções</span><strong id="metric-inspections">0</strong><small id="metric-inspections-note">no período selecionado</small></article>
-      <article class="metric-card"><span>Taxa de resolução</span><strong id="metric-resolution">0%</strong><small id="metric-resolution-note">sem ocorrências registradas</small></article>
-      <article class="metric-card"><span>Registros de DDS</span><strong id="metric-dds">0</strong><small id="metric-dds-note">Soma das participações informadas</small></article>
-      <article class="metric-card"><span>Ocorrências de EPI</span><strong id="metric-epi">0</strong><small id="metric-epi-note">no período selecionado</small></article>
-      <article class="metric-card"><span>Dias de absenteísmo</span><strong id="metric-absence">0</strong><small id="metric-absence-note">0 entrevistas</small></article>
+    <section class="plan-outcomes" aria-label="Resultados do plano">
+      <div><span aria-hidden="true">✓</span><strong>Prevenção<small>em todas as etapas</small></strong></div>
+      <div><span aria-hidden="true">♟</span><strong>Pessoas<small>mais seguras</small></strong></div>
+      <div><span aria-hidden="true">⚙</span><strong>Processos<small>mais eficientes</small></strong></div>
+      <div><span aria-hidden="true">▥</span><strong>Resultados<small>sustentáveis</small></strong></div>
     </section>
 
-    <section class="dashboard-grid">
+    <details class="analytics-drawer">
+      <summary><span><strong>Visão analítica consolidada</strong><small>Gráficos gerais, abas livres e explorador completo</small></span><span aria-hidden="true">⌄</span></summary>
+      <div class="analytics-content">
+        <section class="risk-rail" aria-label="Situação das pendências">
+          <div><span class="rail-dot critical"></span><strong id="rail-critical">0</strong><small>Críticas ou altas em aberto</small></div>
+          <div><span class="rail-dot attention"></span><strong id="rail-overdue">0</strong><small>Prazos vencidos</small></div>
+          <div><span class="rail-dot progress"></span><strong id="rail-progress">0</strong><small>Em andamento</small></div>
+          <div><span class="rail-dot resolved"></span><strong id="rail-resolved">0</strong><small>Resolvidas</small></div>
+        </section>
+
+        <section class="metric-grid" aria-label="Indicadores principais">
+          <article class="metric-card"><span>Inspeções</span><strong id="metric-inspections">0</strong><small id="metric-inspections-note">no período selecionado</small></article>
+          <article class="metric-card"><span>Taxa de resolução</span><strong id="metric-resolution">0%</strong><small id="metric-resolution-note">sem ocorrências registradas</small></article>
+          <article class="metric-card"><span>Registros de DDS</span><strong id="metric-dds">0</strong><small id="metric-dds-note">Soma das participações informadas</small></article>
+          <article class="metric-card"><span>Ocorrências de EPI</span><strong id="metric-epi">0</strong><small id="metric-epi-note">no período selecionado</small></article>
+          <article class="metric-card"><span>Dias de absenteísmo</span><strong id="metric-absence">0</strong><small id="metric-absence-note">0 entrevistas</small></article>
+        </section>
+
+        <section class="dashboard-grid">
       <article class="panel panel-wide">
         <div class="panel-heading"><div><p class="eyebrow">Evolução</p><h2>Atividades por mês</h2></div><div class="legend" id="trend-legend"></div></div>
         <div class="chart" id="trend-chart" role="img" aria-label="Atividades por mês"></div>
@@ -143,7 +221,9 @@
         </div>
         <div class="pagination"><button class="button secondary" id="prev-page" type="button">← Anterior</button><span id="page-info"></span><button class="button secondary" id="next-page" type="button">Próxima →</button></div>
       </article>
-    </section>
+        </section>
+      </div>
+    </details>
     <footer class="dashboard-footer"><span>SAFE · Segurança do trabalho</span><span>Consulta automática a cada 15 s enquanto a página está visível. O Google pode acrescentar atraso.</span><a href="https://docs.google.com/spreadsheets/d/1BcHzuaOFOm2MMs11l-BNBzMmlnzdHdPrnhSnIPk7z30/edit" target="_blank" rel="noopener noreferrer">Abrir planilha ↗</a></footer>
   </main>
 

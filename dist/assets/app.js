@@ -4,8 +4,62 @@ import { setTheme } from './theme.js';
 const $ = id => document.getElementById(id);
 const demo = new URLSearchParams(location.search).get('demo') === '1';
 const state = { data: null, filtered: {}, filters: emptyFilters(), source: 'all', sort: 'date-desc', page: 1, busy: false, paused: false, failures: 0, etag: '', timer: null, undo: null, periodo: 'hoje' };
+const FRONTS = {
+  safety: {
+    direct: ['inspections'],
+    scope: [
+      'Máquinas e injetoras — proteções fixas e móveis, intertravamentos, partes de acesso, botão de emergência e vazamentos.',
+      'Instalações elétricas — quadros fechados e identificados, cabos, tomadas, extensões, aterramento e acesso desobstruído.',
+      'Empilhadeiras e movimentação — checklist, condição do equipamento, buzina, iluminação, pneus, garfos, cinto e operador autorizado.',
+      'Pedestres e circulação — faixas, segregação, corredores desobstruídos, cruzamentos, pontos cegos, sinalização e espelhos.',
+      'Docas e rampas — guarda-corpo, proteção contra quedas, rampas, piso, iluminação, acesso de pedestres e isolamento durante carga.',
+      'EPI — uso correto, adequação ao risco, CA, conservação, higienização, disponibilidade e registro de entrega.',
+      'Produtos químicos — identificação, rotulagem, FDS, armazenamento, incompatibilidades, contenção e kit de emergência.',
+      'Incêndio e emergência — extintores, hidrantes, acesso, sinalização, validade, rotas, iluminação e portas de emergência.',
+      'Brigada — equipamentos, identificação, inspeções, treinamentos, simulados, materiais de primeiros socorros e ponto de encontro.',
+      'Trabalho em altura — acessos, escadas, plataformas, guarda-corpos, ancoragem, autorização, talabarte, APR, PT e supervisão.',
+      'Ergonomia — postura, bancadas, alcance, movimentação manual, levantamento de cargas, repetitividade, pausas e assentos.',
+      'Organização/5S — materiais no piso, corredores, armazenamento, empilhamento, resíduos, ferramentas e limpeza.',
+      'Terceiros — integração, documentação, APR, PT, EPI, isolamento, supervisão e trabalhos críticos.',
+      'Comportamento seguro — uso de celular, adornos, EPI, improvisações, acesso a áreas restritas e cumprimento dos procedimentos.',
+      'Resíduos e meio ambiente — segregação, identificação, recipientes, panos e mantas contaminados, vazamentos e destinação.',
+      'Condições gerais — iluminação, ventilação, piso, escadas, corrimãos, guarda-corpos, portas, estruturas e coberturas.',
+      'Áreas de vivência — sanitários, vestiários, refeitório, bebedouros, higiene, conservação e água disponível.',
+      'Documentação SST — PGR, PCMSO, treinamentos, fichas de EPI, inspeções, APR/PT, registros e manutenção.'
+    ]
+  },
+  actions: { direct: ['pending'], scope: ['Registrar a não conformidade e sua origem.', 'Anexar foto ou outra evidência disponível.', 'Definir ação corretiva clara e verificável.', 'Indicar responsável e prazo de conclusão.', 'Classificar prioridade e risco.', 'Atualizar o status até a verificação da eficácia.'] },
+  machines: { direct: [], match: /maquin|injet|nr ?12|intertrav|protecao|partes moveis|botao de emergencia/, scope: ['Proteções fixas e móveis presentes e sem avarias.', 'Intertravamentos e sensores funcionais.', 'Partes de acesso e zonas de perigo isoladas.', 'Botões de emergência acessíveis e testados.', 'Ausência de improvisos, vazamentos e sinalização inadequada.', 'Ações de manutenção registradas e acompanhadas.'] },
+  cipa: { direct: [], match: /cipa|campanha|reuniao de seguranca|sipat/, scope: ['Reuniões conforme calendário e atas disponíveis.', 'Participação nas inspeções e nos planos de ação.', 'Acompanhamento das condições observadas por setor.', 'Campanhas e comunicação preventiva.', 'Encaminhamentos com responsável e prazo.'] },
+  brigade: { direct: [], match: /brigada|primeiros socorros|abandono|simulad|ponto de encontro/, scope: ['Brigadistas identificados e escala atualizada.', 'Treinamentos e simulados conforme cronograma.', 'Materiais de primeiros socorros disponíveis.', 'Rotas de abandono e ponto de encontro conhecidos.', 'Equipamentos de emergência inspecionados.', 'Registros das ações e oportunidades de melhoria.'] },
+  training: { direct: ['dds'], match: /treinamento|\bdds\b|dialogo de seguranca/, scope: ['Temas relacionados aos riscos encontrados nas inspeções.', 'Participantes, turno, setor e responsável registrados.', 'Conteúdo objetivo e aplicável à rotina.', 'Evidência do treinamento ou DDS.', 'Acompanhamento de reincidências e ações educativas.', 'Programação mensal ou quinzenal.'] },
+  epi: { direct: ['epi'], match: /\bepi\b|equipamento de protecao|certificado de aprovacao|\bca\b/, scope: ['EPI adequado ao risco e à atividade.', 'Certificado de Aprovação válido.', 'Entrega e substituição registradas.', 'Uso correto e fiscalização em campo.', 'Conservação, higienização e guarda.', 'Disponibilidade para todos os trabalhadores expostos.'] },
+  forklifts: { direct: [], match: /empilh|movimentacao|cilindro|garfos|buzina/, scope: ['Checklist antes do uso.', 'Operador autorizado e identificado.', 'Cinto, buzina, iluminação, pneus e garfos em condição segura.', 'Velocidade e estacionamento adequados.', 'Rotas segregadas de pedestres.', 'Troca de cilindro e abastecimento controlados.'] },
+  ergonomics: { direct: ['absences'], match: /ergonom|postura|movimentacao manual|levantamento de carga|repetitiv|pausa|assento/, scope: ['Postura e alcance nos postos de trabalho.', 'Bancadas, assentos e ferramentas adequados.', 'Movimentação e levantamento manual de cargas.', 'Repetitividade, ritmo e pausas.', 'Condições específicas de cada setor.', 'Melhorias implantadas e acompanhadas.'] },
+  contractors: { direct: [], match: /terceir|contratad|\bapr\b|permissao de trabalho|\bpt\b/, scope: ['Integração realizada antes do início do serviço.', 'Documentação e autorizações conferidas.', 'APR/PT emitida para atividades aplicáveis.', 'EPI e isolamento da área adequados.', 'Supervisão durante atividades críticas.', 'Registros e encerramento da atividade.'] },
+  emergencies: { direct: [], match: /emerg|extintor|hidrante|incend|produto quimic|rota de fuga|simulad/, scope: ['Extintores e hidrantes acessíveis, sinalizados e válidos.', 'Rotas de fuga, iluminação e portas de emergência livres.', 'Brigada e contatos de emergência atualizados.', 'Produtos químicos identificados e contidos.', 'Simulados realizados e registrados.', 'Pontos de encontro e procedimentos divulgados.'] },
+  documents: { direct: ['daily', 'summary'], match: /document|\bpgr\b|\bpcmso\b|\bltcat\b|inventario|procedimento|registro|ficha/, scope: ['PGR, PCMSO e LTCAT vigentes e disponíveis.', 'Inventários e planos de ação atualizados.', 'Treinamentos e fichas de EPI arquivados.', 'Inspeções, APR/PT e evidências organizadas.', 'Procedimentos e manutenções registrados.', 'Indicativo diário e resumo mensal conferidos.'] }
+};
+const FRONT_ICONS = {
+  safety: '<svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="5.5"/><path d="m14 14 5 5"/></svg>',
+  actions: '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 4.5V3h6v1.5M9 10l1.5 1.5L14 8m-5 7h6"/></svg>',
+  machines: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2.2 2.2M16.8 16.8 19 19M19 5l-2.2 2.2M7.2 16.8 5 19"/></svg>',
+  cipa: '<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="3"/><circle cx="5" cy="9" r="2"/><circle cx="19" cy="9" r="2"/><path d="M6.5 20v-2.5a5.5 5.5 0 0 1 11 0V20M1.5 19v-2a3.5 3.5 0 0 1 4-3.5m17 5.5v-2a3.5 3.5 0 0 0-4-3.5"/></svg>',
+  brigade: '<svg viewBox="0 0 24 24"><rect x="7" y="8" width="9" height="12" rx="2"/><path d="M10 8V5h5l2 2m-1 3h2.5a2 2 0 0 1 2 2v2M9.5 12h4M11.5 8v12"/></svg>',
+  training: '<svg viewBox="0 0 24 24"><path d="M3 4h18v12H3zM8 20h8m-4-4v4"/><circle cx="8" cy="9" r="2"/><path d="M5.5 14c.7-1.6 1.5-2.4 2.5-2.4s1.8.8 2.5 2.4M14 8h4m-4 3h4"/></svg>',
+  epi: '<svg viewBox="0 0 24 24"><path d="M4 15h16v3H4zM6 15v-3a6 6 0 0 1 12 0v3M12 6v6M8 7.5l1.5 4.5m6.5-4.5L14.5 12"/></svg>',
+  forklifts: '<svg viewBox="0 0 24 24"><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M4 16V8h7l3 5v3m-7-8v5h7m5-9v12h3M19 9h3"/></svg>',
+  ergonomics: '<svg viewBox="0 0 24 24"><circle cx="9" cy="5" r="2"/><path d="M7 9h5l2 5h5v3h-7l-2-4v7M6 9v7h5M4 20h8"/></svg>',
+  contractors: '<svg viewBox="0 0 24 24"><path d="m3 11 4-4 4 2 2-1 8 7-4 4-5-4-2 2-7-6zM8 8l4 4 2-2m-8 4 3 3m6-4 4 4"/></svg>',
+  emergencies: '<svg viewBox="0 0 24 24"><path d="M5 17h14l-1.5-7a5.5 5.5 0 0 0-11 0L5 17zm-2 3h18M12 2v2M3 7 1 6m20 1 2-1"/></svg>',
+  documents: '<svg viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6zM14 2v5h5M9 11h6m-6 4h6m-6 4h4"/></svg>'
+};
 try { state.filters = validateFilters(JSON.parse(localStorage.getItem('safe-filters') || '{}')); } catch {}
 if (demo) document.querySelectorAll('a[href="/relatorios"]').forEach(a => a.href = '/relatorios?demo=1');
+document.querySelectorAll('.front-item').forEach(item => {
+  const icon = item.querySelector('.front-icon');
+  if (icon && FRONT_ICONS[item.dataset.front]) icon.innerHTML = FRONT_ICONS[item.dataset.front];
+});
 function persist() { try { localStorage.setItem('safe-filters', JSON.stringify(state.filters)); } catch {} }
 function options(id, values, all) { const select = $(id); select.innerHTML = `<option value="">${all}</option>` + values.map(x => `<option value="${e(x)}">${e(x)}</option>`).join(''); }
 function syncControls() {
@@ -83,6 +137,108 @@ function avisoDeVazio() {
   return `Nenhum lançamento neste período.${ultima ? ` O lançamento mais recente da planilha é de ${formatDate(ultima)} — use os botões de período acima para vê-lo.` : ' A planilha ainda não tem lançamentos com data.'}`;
 }
 
+function frontRecordText(record) {
+  return normalizeText(Object.entries(record || {}).filter(([key]) => key !== 'rowKey').map(([, value]) => value).join(' '));
+}
+
+function frontRecords(frontKey) {
+  const config = FRONTS[frontKey];
+  if (!config || !state.data) return [];
+  const rows = [...flattenRecords(state.filtered), ...registrosDasAbasProprias()];
+  return rows.filter((record) => config.direct.includes(record.type) || (config.match && config.match.test(frontRecordText(record))));
+}
+
+function frontRecordTitle(record) {
+  if (record.type === 'absences') return `${record.days || 0} dia(s) de ausência${record.notified ? ' · comunicada' : ' · não comunicada'}`;
+  return record.condition || record.description || record.topic || record.activity || record.item || 'Registro sem descrição';
+}
+
+function frontRecordDetails(record) {
+  const yesNo = value => typeof value === 'boolean' ? (value ? 'Sim' : 'Não') : value;
+  const fields = [
+    ['Data', record.recordDate ? formatDate(record.recordDate) : 'Sem data na planilha'],
+    ['Tipo', TYPE_LABELS[record.type] || record.type],
+    ['Setor', record.sector],
+    ['Item / origem', record.item || record.origin],
+    ['Descrição', record.condition || record.description || record.topic || record.activity],
+    ['Detalhamento', record.detail],
+    ['Risco', record.risk],
+    ['Conformidade', record.conformity],
+    ['Ação necessária', record.action],
+    ['Responsável', record.owner],
+    ['Prazo', record.due ? formatDate(record.due) : ''],
+    ['Conclusão', record.completedAt ? formatDate(record.completedAt) : ''],
+    ['Status', record.status],
+    ['Prioridade', record.priority],
+    ['Evidência', record.evidence],
+    ['Observações', record.notes],
+    ['Turno', record.shift],
+    ['Participantes', record.participants ?? record.participantsLabel],
+    ['DDS registrado', yesNo(record.registered)],
+    ['Dias de ausência', record.days],
+    ['Ausência comunicada', yesNo(record.notified)],
+    ['Atestado/documento', yesNo(record.certificate)],
+    ['Apto no retorno', yesNo(record.fitOnReturn)],
+    ['Período do dia', record.periodoDoDia || record.period],
+    ['Horário', record.time]
+  ].filter(([, value]) => value !== '' && value !== null && value !== undefined);
+  return fields.map(([label, value]) => `<div><dt>${e(label)}</dt><dd>${e(value)}</dd></div>`).join('');
+}
+
+function frontMiniBars(entries, emptyText) {
+  if (!entries.length) return `<div class="front-empty">${e(emptyText)}</div>`;
+  const max = Math.max(1, ...entries.map(([, count]) => count));
+  return `<div class="front-mini-chart">${entries.map(([label, count]) => `<div class="front-chart-row"><span title="${e(label)}">${e(label)}</span><span class="front-chart-track"><i style="width:${Math.max(3, count / max * 100)}%"></i></span><strong>${count}</strong></div>`).join('')}</div>`;
+}
+
+function renderFront(frontKey) {
+  const config = FRONTS[frontKey], body = $(`front-body-${frontKey}`);
+  if (!config || !body || !state.data) return;
+  const records = sortRecords(frontRecords(frontKey), 'date-desc');
+  const actionable = records.filter(record => ['pending', 'inspections', 'epi'].includes(record.type) && String(record.status || '').trim());
+  const open = actionable.filter(record => ['open', 'progress'].includes(statusBucket(record.status))).length;
+  const resolved = actionable.filter(record => statusBucket(record.status) === 'resolved').length;
+  const overdue = actionable.filter(record => isOverdue(record)).length;
+  const sectors = new Set(records.map(record => String(record.sector || '').trim()).filter(Boolean));
+  const byType = Object.entries(records.reduce((groups, record) => {
+    const label = TYPE_LABELS[record.type] || 'Outros';
+    groups[label] = (groups[label] || 0) + 1;
+    return groups;
+  }, {})).sort((a, b) => b[1] - a[1]);
+  const bySector = Object.entries(records.reduce((groups, record) => {
+    const label = record.sector || 'Sem setor';
+    groups[label] = (groups[label] || 0) + 1;
+    return groups;
+  }, {})).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const resolution = actionable.length ? `${Math.round(resolved / actionable.length * 100)}%` : '—';
+  const recordsHtml = records.length ? records.map(record => {
+    const status = record.status ? statusBucket(record.status) : '';
+    return `<details class="front-record"><summary><span class="front-record-date">${record.recordDate ? formatDate(record.recordDate) : 'Sem data'}</span><span class="front-record-sector">${e(record.sector || TYPE_LABELS[record.type] || 'Geral')}</span><span class="front-record-title">${e(frontRecordTitle(record))}</span>${record.status ? `<span class="status-chip ${status}">${e(record.status)}</span>` : `<span class="status-chip">${e(TYPE_LABELS[record.type] || 'Registro')}</span>`}</summary><dl class="front-record-detail">${frontRecordDetails(record)}</dl></details>`;
+  }).join('') : '<div class="front-empty">Nenhum registro relacionado foi encontrado neste período. O checklist da frente continua disponível para orientar a próxima verificação.</div>';
+  body.innerHTML = `<div class="front-dashboard">
+    <div class="front-kpis">
+      <div class="front-kpi"><span>Registros relacionados</span><strong>${records.length}</strong><small>no período e filtros atuais</small></div>
+      <div class="front-kpi"><span>Em aberto</span><strong>${open}</strong><small>com status informado</small></div>
+      <div class="front-kpi"><span>Taxa de resolução</span><strong>${resolution}</strong><small>${resolved} concluído(s) de ${actionable.length}</small></div>
+      <div class="front-kpi"><span>Prazos vencidos</span><strong>${overdue}</strong><small>${sectors.size} setor(es) relacionado(s)</small></div>
+    </div>
+    <div class="front-grid">
+      <section class="front-card"><h3>O que verificar e desenvolver</h3><ul class="scope-list">${config.scope.map(item => `<li>${e(item)}</li>`).join('')}</ul></section>
+      <section class="front-card front-chart-stack"><div><h3>Registros por origem</h3>${frontMiniBars(byType, 'Ainda não há dados para compor este gráfico.')}</div><div><h3>Concentração por setor</h3>${frontMiniBars(bySector, 'Os setores aparecerão quando houver registros relacionados.')}</div></section>
+      <section class="front-card front-records"><div class="front-card-heading"><h3>Todos os registros desta frente</h3><span>${records.length} registro${records.length === 1 ? '' : 's'}</span></div><div class="front-records-list">${recordsHtml}</div></section>
+    </div>
+  </div>`;
+  body.dataset.dirty = 'false';
+}
+
+function renderFronts() {
+  document.querySelectorAll('.front-item').forEach(item => {
+    const body = $(`front-body-${item.dataset.front}`);
+    if (body) body.dataset.dirty = 'true';
+    if (item.open) renderFront(item.dataset.front);
+  });
+}
+
 function applyFilters() { state.page = 1; state.filters = validateFilters(state.filters); syncControls(); syncPeriodo(); persist(); render(); }
 function render() {
   if (!state.data) return;
@@ -99,7 +255,7 @@ function render() {
   $('metric-absence-note').textContent = `${m.interviews} entrevistas · data da entrevista`;
   const aviso = avisoDeVazio();
   $('active-filters').innerHTML = `${e(filterDescription(state.filters))}${aviso ? `<span class="empty-hint">${e(aviso)}</span>` : ''}`;
-  renderTrend(); renderStatus(); renderSectors(); renderEpi(); renderDaily(); renderSummary(); renderTable();
+  renderTrend(); renderStatus(); renderSectors(); renderEpi(); renderDaily(); renderSummary(); renderTable(); renderFronts();
 }
 // Inspeção de EPI: acompanha o mesmo período escolhido nos botões acima.
 // O nome do colaborador não entra: o painel é público e a ocorrência é pessoal.
@@ -342,6 +498,11 @@ $('prev-page').addEventListener('click',()=>{state.page--;renderTable();}); $('n
 function chartFilter(event) { const target=event.target.closest('[data-month],[data-status],[data-sector]');if(!target)return;if(target.dataset.month)state.filters.months=[target.dataset.month];if(target.dataset.status)state.filters.status=target.dataset.status;if(target.dataset.sector)state.filters.sector=target.dataset.sector;applyFilters(); }
 for(const id of ['trend-chart','status-key','sector-chart']) $(id).addEventListener('click',chartFilter);
 $('trend-chart').addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();chartFilter(event);}});
+document.querySelectorAll('.front-item').forEach(item => item.addEventListener('toggle', () => {
+  if (!item.open) return;
+  document.querySelectorAll('.front-item[open]').forEach(other => { if (other !== item) other.open = false; });
+  if (state.data) renderFront(item.dataset.front);
+}));
 $('refresh-button').addEventListener('click',()=>load(true));
 $('pause-button').addEventListener('click',()=>{
   state.paused=!state.paused;
