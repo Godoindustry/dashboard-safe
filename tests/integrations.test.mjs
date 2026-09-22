@@ -4,6 +4,8 @@ import { scheduledReportDue, scheduledDateKey } from '../netlify/functions/_shar
 import { recordDestination, normalizeRecord } from '../netlify/functions/records.mjs';
 import { decodePhoto, validDate } from '../netlify/functions/photos.mjs';
 import { parseGvizRows } from '../netlify/functions/_shared/google-sheets.mjs';
+import { runLegacyHandler } from '../api/_shared/adapter.mjs';
+import { cronAuthorized, isLastDayInSaoPaulo } from '../api/_shared/cron.mjs';
 
 test('agendamento semanal respeita sexta-feira às 16h em São Paulo', () => {
   assert.equal(scheduledReportDue('weekly', new Date('2026-09-25T19:00:00Z')), true);
@@ -40,4 +42,25 @@ test('validação de foto rejeita conteúdo disfarçado e datas inválidas', () 
 test('abas livres do Sheets preservam título e cabeçalho como linhas', () => {
   const body = 'google.visualization.Query.setResponse(' + JSON.stringify({ status: 'ok', table: { cols: [{ id: 'A' }, { id: 'B' }], rows: [{ c: [{ v: 'Título' }, null] }, { c: [{ v: 'Atividade' }, { v: 'Status' }] }] } }) + ');';
   assert.deepEqual(parseGvizRows(body), [['Título', ''], ['Atividade', 'Status']]);
+});
+
+test('adaptador da Vercel preserva JSON e respostas binárias', async () => {
+  const json = await runLegacyHandler(async (event) => ({ statusCode: 201, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ method: event.httpMethod, query: event.queryStringParameters.x }) }), new Request('https://safe.test/api/test?x=1', { method: 'POST', body: '{}' }));
+  assert.equal(json.status, 201);
+  assert.deepEqual(await json.json(), { method: 'POST', query: '1' });
+  const binary = await runLegacyHandler(async () => ({ statusCode: 200, isBase64Encoded: true, headers: { 'Content-Type': 'image/jpeg' }, body: Buffer.from('foto').toString('base64') }), new Request('https://safe.test/api/foto'));
+  assert.equal(Buffer.from(await binary.arrayBuffer()).toString(), 'foto');
+});
+
+test('cron da Vercel exige segredo e reconhece o último dia em São Paulo', () => {
+  const previous = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = 'segredo-de-teste-com-mais-de-16';
+  try {
+    assert.equal(cronAuthorized(new Request('https://safe.test/api/cron', { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } })).ok, true);
+    assert.equal(cronAuthorized(new Request('https://safe.test/api/cron')).status, 401);
+    assert.equal(isLastDayInSaoPaulo(new Date('2026-09-30T18:37:00Z')), true);
+    assert.equal(isLastDayInSaoPaulo(new Date('2026-09-29T18:37:00Z')), false);
+  } finally {
+    if (previous === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = previous;
+  }
 });

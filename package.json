@@ -6,9 +6,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node scripts/dev-server.mjs",
-    "publicar": "node scripts/publish.mjs",
     "test": "node --test --test-isolation=none tests/*.test.mjs",
-    "check": "node --check dist/assets/shared.js && node --check dist/assets/app.js && node --check dist/assets/reports.js && node --check netlify/functions/sheets-data.mjs && node --check netlify/functions/ai.mjs && node --check netlify/functions/reports-auth.mjs && node --check netlify/functions/photos.mjs && node --check netlify/functions/records.mjs && node --check netlify/functions/weekly-report.mjs && node --check netlify/functions/monthly-report.mjs"
+    "check": "node --check dist/assets/shared.js && node --check dist/assets/app.js && node --check dist/assets/reports.js && node --check netlify/functions/sheets-data.mjs && node --check netlify/functions/ai.mjs && node --check netlify/functions/reports-auth.mjs && node --check netlify/functions/photos.mjs && node --check netlify/functions/records.mjs && node --check api/dados.mjs && node --check api/fotos.mjs && node --check api/registros.mjs && node --check api/relatorios-acesso.mjs && node --check api/cron/relatorio-semanal.mjs && node --check api/cron/relatorio-mensal.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "^11.0.3",

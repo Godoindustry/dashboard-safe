@@ -12,21 +12,21 @@
   <h2>Como publicar</h2>
   <ol>
     <li>Extraia o projeto inteiro. Não envie apenas o HTML ou a pasta <code>dist</code>, pois os lançamentos, fotos e agendamentos usam funções do servidor.</li>
-    <li>Instale o <a href="https://nodejs.org/">Node.js 24 LTS</a> e tenha uma conta <a href="https://app.netlify.com/">Netlify</a>.</li>
-    <li>Publique o repositório no Netlify e cadastre as variáveis descritas em <code>.env.example</code>.</li>
+    <li>Instale o <a href="https://nodejs.org/">Node.js 24 LTS</a> para testes locais e mantenha o repositório conectado ao projeto da <a href="https://vercel.com/">Vercel</a>.</li>
+    <li>Na Vercel, mantenha a raiz do repositório como diretório do projeto e cadastre as variáveis descritas em <code>.env.example</code>.</li>
     <li>Ative as APIs Google Sheets e Drive. Compartilhe a planilha como Editor com a conta de serviço.</li>
     <li>Configure uma pasta privada do Drive. Para conta de serviço, use Drive compartilhado; para Meu Drive, use OAuth.</li>
-    <li>Defina <code>REPORTS_ACCESS_CODE</code> e <code>REPORTS_SESSION_SECRET</code>, publique e teste um lançamento com foto.</li>
+    <li>Defina <code>REPORTS_ACCESS_CODE</code>, <code>REPORTS_SESSION_SECRET</code> e <code>CRON_SECRET</code>, publique e teste um lançamento com foto.</li>
   </ol>
 
-  <div class="notice"><strong>Nunca coloque chaves dentro de <code>dist</code> ou no Git.</strong> Credenciais Google, Groq e o código de acesso pertencem às variáveis privadas do Netlify.</div>
+  <div class="notice"><strong>Nunca coloque chaves dentro de <code>dist</code> ou no Git.</strong> Credenciais Google, Groq e códigos de acesso pertencem às variáveis privadas da Vercel.</div>
 
   <h2>Como funciona</h2>
   <p>Abra uma das 12 frentes, preencha “Novo registro” e anexe até oito fotos. Plano de Ação entra em Pendências, Treinamentos/DDS entra em DDS e as demais frentes entram em Inspeções por Setor. As fotos são reduzidas antes do envio e ficam na pasta privada do Google Drive.</p>
   <p>A pessoa precisa entrar em <code>/relatorios</code> antes de lançar ou visualizar evidências. O painel de leitura continua separado. Os relatórios manuais já puxam as fotos do período.</p>
 
   <h2>Automação</h2>
-  <p>O relatório semanal é gerado toda sexta-feira às 16h. O mensal é gerado no último dia do mês às 15h. Os horários seguem São Paulo, as execuções repetidas não criam duplicatas e os PDFs são arquivados no Drive. Toda saída ainda exige revisão e aprovação técnica antes de distribuição externa.</p>
+  <p>O Vercel Cron chama o semanal toda sexta às 19h UTC, equivalente a 16h em São Paulo, e verifica o mensal nos dias 28 a 31 às 18h UTC, gerando somente no último dia, às 15h locais. No plano Hobby, a execução pode acontecer em qualquer minuto dentro dessa hora. Execuções repetidas não criam duplicatas.</p>
 
   <h2>Cuidados</h2>
   <p>Retire o compartilhamento público da planilha antes de incluir dados pessoais. Não fotografe documentos médicos, telas com dados pessoais ou pessoas sem base adequada. O site não oferece formulário de absenteísmo: esse conjunto sensível continua restrito à planilha.</p>

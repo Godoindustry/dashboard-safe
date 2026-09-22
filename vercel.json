@@ -4,6 +4,13 @@
   "buildCommand": "echo dist ja construido e verificado localmente",
   "outputDirectory": "dist",
   "trailingSlash": false,
+  "functions": {
+    "api/**/*.mjs": { "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/cron/relatorio-semanal", "schedule": "0 19 * * 5" },
+    { "path": "/api/cron/relatorio-mensal", "schedule": "0 18 28-31 * *" }
+  ],
   "rewrites": [
     { "source": "/relatorios", "destination": "/relatorios.html" }
   ],

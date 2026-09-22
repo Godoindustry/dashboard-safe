@@ -6,12 +6,6 @@
 [build.environment]
   NODE_VERSION = "24"
 
-[functions."weekly-report"]
-  schedule = "0 17,18,19 * * 5"
-
-[functions."monthly-report"]
-  schedule = "0 17,18,19 28-31 * *"
-
 [[redirects]]
   from = "/api/dados"
   to = "/.netlify/functions/sheets-data"

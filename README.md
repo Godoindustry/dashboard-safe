@@ -1,14 +1,14 @@
 # DASHBOARD SAFE · SAFE
 
-Dashboard de segurança do trabalho, Google Sheets, Groq e Netlify. Versão 2.0.
+Dashboard de segurança do trabalho, Google Sheets, Google Drive, Groq e Vercel. Versão 2.0.
 
 ## Comece aqui
 
-Abra `LEIA-ME.html`. No Windows, `PUBLICAR-NETLIFY.cmd` inicia uma publicação guiada. É necessário Node.js 24 LTS, internet e sua conta Netlify Free. O publicador pede login, cria ou vincula um projeto, importa as configurações privadas quando autorizadas e publica o painel com as funções de servidor. Não publica nada apenas por abrir esta pasta.
+Abra `LEIA-ME.html`. A produção usa a Vercel conectada ao repositório GitHub. Cada `push` em `main` inicia uma publicação conforme `vercel.json`.
 
-O ZIP de entrega contém o projeto completo, sem chaves, dependências instaladas ou arquivos de teste gerados. Extraia antes de usar. **Não arraste somente `dist` para Netlify Drop:** esse fluxo não prepara as funções de IA e Google Sheets. Use o publicador ou um repositório Git conectado ao Netlify.
+O projeto completo inclui `dist`, `api`, as funções compartilhadas e `vercel.json`. Não publique somente `dist`: isso removeria lançamentos, fotos e agendamentos.
 
-Se publicar por Git: base desta pasta (`DASHBOARD SAFE` em um repositório que também contém outros projetos); build `npm run build && npm run check && npm test`; publish `dist`; functions `netlify/functions`. O `netlify.toml` já configura tudo. Configure as chaves antes do deploy.
+Na Vercel: Root Directory na raiz do repositório; Build Command conforme `vercel.json`; Output Directory `dist`. As funções em `api/` são detectadas automaticamente. Configure as variáveis antes do deploy.
 
 ## O que funciona
 
@@ -25,19 +25,19 @@ Se publicar por Git: base desta pasta (`DASHBOARD SAFE` em um repositório que t
 
 `GROQ_DASHBOARD_API_KEY`: chave 2, perguntas e organização. `GROQ_REPORT_API_KEY`: chave 1, relatórios semanais e mensais. Não há fallback entre as chaves. Modelo fixado: `openai/gpt-oss-20b`, raciocínio baixo e saída limitada.
 
-Na cópia local, as chaves fornecidas estão em `.env.local`, ignorado pelo Git e excluído do ZIP. O publicador pode importar esse arquivo para variáveis do Netlify, sem imprimir valores. Em uma cópia extraída do ZIP, cadastre as duas variáveis no Netlify (escopo Functions, contexto Production), ou copie seu `.env.local` privado para a raiz antes de publicar. Nunca o coloque dentro de `dist`. Como as chaves foram compartilhadas em conversa, é recomendável substituí-las no Groq antes de distribuir o projeto.
+Na cópia local, chaves ficam em `.env.local`, ignorado pelo Git. Em produção, cadastre-as em Vercel → Project → Settings → Environment Variables. Nunca coloque segredos dentro de `dist` ou no repositório.
 
-O painel não precisa de banco de dados externo pago. Netlify Blobs guarda apenas um pequeno contador global de consumo, sem conversas nem dados da planilha. Se esse contador estiver indisponível, a IA bloqueia a chamada para não gastar sem controle.
+O fluxo de planilha, fotos e relatórios não precisa de banco de dados externo. A IA é opcional; lançamentos e PDFs não dependem dela.
 
 ### Google Drive e gravação pelo site
 
-Ative as APIs Google Sheets e Google Drive. A planilha deve ser compartilhada como **Editor** com `GOOGLE_SERVICE_ACCOUNT_EMAIL`. Para o Drive, escolha um destes modos:
+Ative as APIs Google Sheets e Google Drive. Cadastre as variáveis na Vercel. A planilha deve ser compartilhada como **Editor** com `GOOGLE_SERVICE_ACCOUNT_EMAIL`. Para o Drive, escolha um destes modos:
 
 - Google Workspace com Drive compartilhado: adicione a conta de serviço como colaboradora e configure `GOOGLE_DRIVE_SHARED_DRIVE_ID` e `GOOGLE_DRIVE_FOLDER_ID`.
 - Google Workspace com delegação no domínio: configure `GOOGLE_DRIVE_IMPERSONATE_EMAIL` e a delegação administrativa para o escopo Drive.
 - Meu Drive de uma pessoa: configure `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET` e `GOOGLE_DRIVE_REFRESH_TOKEN`, além de `GOOGLE_DRIVE_FOLDER_ID`.
 
-Contas de serviço não possuem cota própria para serem donas de arquivos em “Meu Drive”; sem Drive compartilhado ou impersonação, use OAuth. Também configure obrigatoriamente `REPORTS_ACCESS_CODE` e um `REPORTS_SESSION_SECRET` longo: eles protegem os lançamentos e as fotos. `REPORT_OWNER` define o responsável mostrado nos PDFs automáticos.
+Contas de serviço não possuem cota própria para serem donas de arquivos em “Meu Drive”; sem Drive compartilhado ou impersonação, use OAuth. Configure obrigatoriamente `REPORTS_ACCESS_CODE`, `REPORTS_SESSION_SECRET` e `CRON_SECRET` com pelo menos 16 caracteres. `REPORT_OWNER` define o responsável mostrado nos PDFs automáticos.
 
 ## Atualização e limites Free
 
@@ -45,9 +45,9 @@ Contas de serviço não possuem cota própria para serem donas de arquivos em �
 
 IA: no máximo **60.000 tokens reservados/dia, 30 chamadas/dia, 6.000 tokens reservados por chamada e intervalo global de 65 s**, compartilhados pelas duas chaves e por todos os visitantes deste projeto. Contagem conservadora por bytes de entrada + margem + teto de saída; falhas também ficam reservadas. O orçamento diário reinicia às 00h UTC (21h em São Paulo). Com perguntas maiores, o limite de tokens pode bloquear antes das 30 chamadas. Não há tentativas automáticas nem IA em cada atualização.
 
-Esses limites são deste dashboard, não leitura do saldo real da conta Groq. Chaves da mesma organização compartilham limites, e outros aplicativos também podem consumi-los. Confira os limites efetivos na sua conta. Para manter custo zero, não migre para plano pago nem habilite cobrança automática. O plano Netlify Free atual tem teto de 300 créditos/mês; tráfego, funções e publicações consomem créditos. Se esgotar, o serviço pode pausar. **Gratuidade com acesso ilimitado ou disponibilidade ininterrupta não pode ser garantida.**
+Esses limites são deste dashboard, não leitura do saldo real da conta Groq. Na Vercel Hobby, cron jobs podem executar em qualquer minuto dentro da hora configurada; em planos superiores, executam no minuto indicado. Assim, no Hobby, “16h” significa entre 16:00 e 16:59. **Gratuidade com acesso ilimitado ou disponibilidade ininterrupta não pode ser garantida.**
 
-Referências oficiais consultadas em 11/09/2026: [Netlify Free](https://www.netlify.com/pricing/), [limites Groq](https://console.groq.com/docs/rate-limits), [CLI Netlify](https://docs.netlify.com/api-and-cli-guides/cli-guides/get-started-with-cli/), [Netlify Blobs](https://docs.netlify.com/build/data-and-storage/netlify-blobs/).
+Referências oficiais: [Vercel Cron Jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs), [limites das Vercel Functions](https://vercel.com/docs/functions/limitations) e [limites Groq](https://console.groq.com/docs/rate-limits).
 
 ## Dados e privacidade
 
@@ -59,7 +59,7 @@ Taxa de resolução e alertas contam somente a aba Pendências: uma inspeção e
 
 Nomes, CID, motivos e descrição médica da aba Absenteísmo não são enviados ao navegador ou ao Groq. O navegador recebe data, setor, dias e comunicação, não anonimização irreversível. Textos livres de inspeções e pendências são mostrados no painel: não inclua informações pessoais neles. A IA recebe somente agregados e filtros.
 
-**Antes de registrar dados pessoais na planilha, retire o compartilhamento público** e configure a conta de serviço Google: compartilhe a planilha como Editor com o e-mail da conta e preencha `GOOGLE_SERVICE_ACCOUNT_EMAIL` e `GOOGLE_PRIVATE_KEY` no Netlify. Apenas uma das duas preenchida causa bloqueio. O link público original permite ver a planilha fora do dashboard; o painel não corrige esse compartilhamento.
+**Antes de registrar dados pessoais na planilha, retire o compartilhamento público** e configure a conta de serviço Google: compartilhe a planilha como Editor e preencha `GOOGLE_SERVICE_ACCOUNT_EMAIL` e `GOOGLE_PRIVATE_KEY` na Vercel. Apenas uma das duas preenchida causa bloqueio.
 
 A leitura pública do painel continua separada dos lançamentos. Para gravar registros ou abrir fotos, a pessoa precisa entrar em `/relatorios`; o cookie protegido vale para todo o site por 12 horas. Os PDFs manuais ficam no computador, e os PDFs automáticos são arquivados na pasta configurada do Drive. As imagens não são publicadas por URL aberta: passam por uma função autenticada.
 
