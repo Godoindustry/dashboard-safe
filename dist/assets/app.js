@@ -3,7 +3,7 @@ import { emptyFilters, validateFilters, filterData, flattenRecords, sortRecords,
 import { setTheme } from './theme.js';
 const $ = id => document.getElementById(id);
 const demo = new URLSearchParams(location.search).get('demo') === '1';
-const state = { data: null, filtered: {}, filters: emptyFilters(), source: 'all', sort: 'date-desc', page: 1, busy: false, paused: false, failures: 0, etag: '', timer: null, undo: null, periodo: 'hoje' };
+const state = { data: null, filtered: {}, filters: emptyFilters(), source: 'all', sort: 'date-desc', page: 1, busy: false, paused: false, failures: 0, etag: '', timer: null, undo: null, periodo: 'hoje', frontPhotos: {}, photoLoading: {}, entryAccess: demo ? false : null, entryConfigured: demo ? false : null };
 const FRONTS = {
   safety: {
     direct: ['inspections'],
@@ -191,9 +191,136 @@ function frontMiniBars(entries, emptyText) {
   return `<div class="front-mini-chart">${entries.map(([label, count]) => `<div class="front-chart-row"><span title="${e(label)}">${e(label)}</span><span class="front-chart-track"><i style="width:${Math.max(3, count / max * 100)}%"></i></span><strong>${count}</strong></div>`).join('')}</div>`;
 }
 
+function frontLabel(frontKey) {
+  return document.querySelector(`.front-item[data-front="${frontKey}"] summary strong`)?.textContent || frontKey;
+}
+
+function photoGallery(frontKey) {
+  const photos = state.frontPhotos[frontKey];
+  if (demo) return '<div class="front-empty">Na demonstração, os anexos ficam desativados. No painel conectado, as fotos são enviadas à pasta privada do Google Drive.</div>';
+  if (!photos) return '<div class="front-empty">Carregando as evidências desta frente…</div>';
+  if (!photos.length) return '<div class="front-empty">Nenhuma foto salva nesta frente. As novas evidências aparecerão aqui e entrarão automaticamente nos relatórios.</div>';
+  return `<div class="front-photo-grid">${photos.map((photo, index) => `<figure><img src="${e(photo.contentUrl)}" alt="Evidência ${index + 1} de ${e(frontLabel(frontKey))}" loading="lazy"><figcaption><strong>${e(photo.caption || `Evidência de ${photo.date ? formatDate(photo.date) : 'segurança'}`)}</strong><span>${e([photo.sector, photo.date ? formatDate(photo.date) : ''].filter(Boolean).join(' · '))}</span></figcaption></figure>`).join('')}</div>`;
+}
+
+function frontEntryFields(frontKey) {
+  if (frontKey === 'training') return `<label>Horário<input name="time" type="time"></label><label>Turno<input name="shift" maxlength="80" placeholder="Ex.: 1º turno"></label><label>Participantes<input name="participants" type="number" min="0" max="10000" inputmode="numeric"></label><label class="front-check"><input name="registered" type="checkbox" checked> Registro do DDS realizado</label>`;
+  return `<label>Risco observado<input name="risk" maxlength="500" placeholder="Qual é o risco?"></label><label>Conformidade<select name="conformity"><option value="">Não informada</option><option>Conforme</option><option>Não conforme</option><option>Não se aplica</option></select></label>`;
+}
+
+function frontEntryForm(frontKey) {
+  const training = frontKey === 'training';
+  const action = frontKey === 'actions';
+  const description = training ? 'Tema do DDS' : action ? 'Não conformidade / problema' : 'Condição observada';
+  const canWrite = state.entryAccess === true && state.entryConfigured === true;
+  const accessMessage = demo ? 'Envio desativado na demonstração.' : state.entryConfigured === false ? 'Integração ainda não liberada pelo administrador.' : state.entryAccess === false ? 'Entre em <a href="/relatorios">Relatórios</a> para liberar os lançamentos.' : state.entryAccess === true ? 'Acesso autorizado. O lançamento será salvo no Google.' : 'Verificando o acesso protegido…';
+  return `<section class="front-card front-entry">
+    <div class="front-card-heading"><div><h3>Novo registro</h3><p>Salva os dados na planilha Google e as fotos no Google Drive.</p></div><span class="front-storage-badge">Google</span></div>
+    <form class="front-entry-form" data-front-form="${e(frontKey)}">
+      <div class="front-form-grid">
+        <label>Data<input name="date" type="date" value="${dayKeyInSaoPaulo()}" required></label>
+        <label>Setor / local<input name="sector" maxlength="120" required placeholder="Ex.: Produção"></label>
+        <label class="field-wide">${description}<textarea name="description" rows="3" maxlength="1000" required placeholder="Descreva com clareza o que foi observado"></textarea></label>
+        ${frontEntryFields(frontKey)}
+        ${training ? '' : `<label>Prioridade<select name="priority"><option>Não informada</option><option>Crítica</option><option>Alta</option><option>Média</option><option>Baixa</option></select></label>`}
+        <label>Status<select name="status"><option>Em aberto</option><option>Em andamento</option><option>Resolvida</option><option>Cancelada</option></select></label>
+        <label class="field-wide">Ação necessária<textarea name="action" rows="2" maxlength="1000" placeholder="O que precisa ser feito?"></textarea></label>
+        <label>Responsável<input name="owner" maxlength="160" placeholder="Nome ou função"></label>
+        <label>Prazo<input name="due" type="date"></label>
+        <label class="field-wide">Observações<textarea name="notes" rows="2" maxlength="1500"></textarea></label>
+        <label class="field-wide">Legenda das fotos<input name="photoCaption" maxlength="300" placeholder="Onde foi e o que as imagens mostram"></label>
+        <label class="front-photo-picker field-wide"><span aria-hidden="true">＋</span><strong>Anexar fotos</strong><small>Até 8 imagens · câmera ou galeria · redução automática</small><input name="photos" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple></label>
+      </div>
+      <div class="front-submit-row"><button class="button primary" type="submit"${canWrite ? '' : ' disabled'}>Salvar registro e fotos</button><span class="front-form-status" data-front-form-status aria-live="polite">${accessMessage}</span></div>
+    </form>
+  </section>`;
+}
+
+async function loadFrontPhotos(frontKey, force = false) {
+  if (demo || state.photoLoading[frontKey] || (!force && state.frontPhotos[frontKey])) return;
+  state.photoLoading[frontKey] = true;
+  const gallery = document.querySelector(`[data-front-gallery="${frontKey}"]`);
+  try {
+    const result = await fetchJson(`/api/fotos?front=${encodeURIComponent(frontKey)}&limit=12`, { timeout: 20000 });
+    state.frontPhotos[frontKey] = result.photos || [];
+    if (gallery) gallery.innerHTML = photoGallery(frontKey);
+  } catch (error) {
+    if (gallery) gallery.innerHTML = `<div class="front-empty front-photo-error">${error.status === 401 ? 'Entre em <a href="/relatorios">Relatórios</a> para liberar os lançamentos e as fotos.' : e(error.message)}</div>`;
+  } finally { state.photoLoading[frontKey] = false; }
+}
+
+function resizePhoto(file) {
+  return new Promise((resolve, reject) => {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return reject(new Error(`${file.name}: use uma imagem JPEG, PNG ou WebP.`));
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error(`Não foi possível ler ${file.name}.`));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error(`${file.name} não é uma imagem válida.`));
+      image.onload = () => {
+        const render = (maxSide, quality) => {
+          const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+          const width = Math.max(1, Math.round(image.naturalWidth * scale)), height = Math.max(1, Math.round(image.naturalHeight * scale));
+          const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+          const context = canvas.getContext('2d'); context.fillStyle = '#fff'; context.fillRect(0, 0, width, height); context.drawImage(image, 0, 0, width, height);
+          return { width, height, dataUrl: canvas.toDataURL('image/jpeg', quality) };
+        };
+        let result = render(1600, .76);
+        if (result.dataUrl.length > 3_900_000) result = render(1100, .66);
+        if (result.dataUrl.length > 4_000_000) return reject(new Error(`${file.name} continuou muito grande após a redução.`));
+        resolve({ ...result, originalName: file.name });
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function saveFrontRecord(form) {
+  if (demo || !state.entryAccess || !state.entryConfigured) return;
+  const front = form.dataset.frontForm, status = form.querySelector('[data-front-form-status]'), button = form.querySelector('[type="submit"]');
+  const data = new FormData(form), files = [...(form.elements.photos.files || [])];
+  const recordId = `SAFE-${String(data.get('date') || dayKeyInSaoPaulo()).replaceAll('-', '')}-${front}-${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
+  if (files.length > 8) { status.textContent = 'Selecione no máximo 8 fotos por registro.'; return; }
+  const frontBody = form.closest('.front-body');
+  button.disabled = true; if (frontBody) frontBody.dataset.editing = 'true';
+  try {
+    const photoUrls = [];
+    for (let index = 0; index < files.length; index++) {
+      status.textContent = `Preparando e enviando foto ${index + 1} de ${files.length}…`;
+      const photo = await resizePhoto(files[index]);
+      const result = await fetchJson('/api/fotos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...photo, recordId, front, date: data.get('date'), sector: data.get('sector'), caption: data.get('photoCaption') }), timeout: 45000 });
+      photoUrls.push(result.photo.driveUrl);
+    }
+    status.textContent = 'Gravando os dados na planilha Google…';
+    const payload = Object.fromEntries([...data.entries()].filter(([key]) => !['photos', 'photoCaption', 'registered'].includes(key)));
+    payload.front = front; payload.recordId = recordId; payload.registered = Boolean(form.elements.registered?.checked); payload.photoUrls = photoUrls;
+    await fetchJson('/api/registros', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), timeout: 25000 });
+    status.textContent = `Registro salvo${files.length ? ` com ${files.length} foto(s)` : ''}. Ele já fará parte dos relatórios automáticos.`;
+    form.reset(); form.elements.date.value = dayKeyInSaoPaulo(); if (frontBody) frontBody.dataset.editing = 'false';
+    state.frontPhotos[front] = null; await loadFrontPhotos(front, true);
+    setTimeout(() => { if (!state.busy) load(true); }, 11000);
+  } catch (error) {
+    status.innerHTML = error.status === 401 ? 'Acesso necessário. Entre em <a href="/relatorios">Relatórios</a>, depois volte para salvar.' : e(error.message);
+  } finally { button.disabled = false; }
+}
+
+async function checkEntryAccess() {
+  if (demo) return;
+  try {
+    const auth = await fetchJson('/api/relatorios-acesso');
+    state.entryAccess = auth.authenticated === true;
+    state.entryConfigured = auth.writeEnabled === true;
+  } catch {
+    state.entryAccess = false;
+    state.entryConfigured = null;
+  }
+  renderFronts();
+}
+
 function renderFront(frontKey) {
   const config = FRONTS[frontKey], body = $(`front-body-${frontKey}`);
-  if (!config || !body || !state.data) return;
+  if (!config || !body) return;
   const records = sortRecords(frontRecords(frontKey), 'date-desc');
   const actionable = records.filter(record => ['pending', 'inspections', 'epi'].includes(record.type) && String(record.status || '').trim());
   const open = actionable.filter(record => ['open', 'progress'].includes(statusBucket(record.status))).length;
@@ -225,17 +352,20 @@ function renderFront(frontKey) {
     <div class="front-grid">
       <section class="front-card"><h3>O que verificar e desenvolver</h3><ul class="scope-list">${config.scope.map(item => `<li>${e(item)}</li>`).join('')}</ul></section>
       <section class="front-card front-chart-stack"><div><h3>Registros por origem</h3>${frontMiniBars(byType, 'Ainda não há dados para compor este gráfico.')}</div><div><h3>Concentração por setor</h3>${frontMiniBars(bySector, 'Os setores aparecerão quando houver registros relacionados.')}</div></section>
+      ${frontEntryForm(frontKey)}
+      <section class="front-card front-photos"><div class="front-card-heading"><div><h3>Evidências fotográficas</h3><p>Fotos privadas do Drive que serão puxadas pelos relatórios.</p></div><span>${state.frontPhotos[frontKey]?.length || 0} foto(s)</span></div><div data-front-gallery="${e(frontKey)}">${photoGallery(frontKey)}</div></section>
       <section class="front-card front-records"><div class="front-card-heading"><h3>Todos os registros desta frente</h3><span>${records.length} registro${records.length === 1 ? '' : 's'}</span></div><div class="front-records-list">${recordsHtml}</div></section>
     </div>
   </div>`;
   body.dataset.dirty = 'false';
+  loadFrontPhotos(frontKey);
 }
 
 function renderFronts() {
   document.querySelectorAll('.front-item').forEach(item => {
     const body = $(`front-body-${item.dataset.front}`);
     if (body) body.dataset.dirty = 'true';
-    if (item.open) renderFront(item.dataset.front);
+    if (item.open && body?.dataset.editing !== 'true') renderFront(item.dataset.front);
   });
 }
 
@@ -501,8 +631,18 @@ $('trend-chart').addEventListener('keydown',event=>{if(['Enter',' '].includes(ev
 document.querySelectorAll('.front-item').forEach(item => item.addEventListener('toggle', () => {
   if (!item.open) return;
   document.querySelectorAll('.front-item[open]').forEach(other => { if (other !== item) other.open = false; });
-  if (state.data) renderFront(item.dataset.front);
+  renderFront(item.dataset.front);
 }));
+document.querySelector('.fronts-list').addEventListener('input', event => {
+  const form = event.target.closest('.front-entry-form');
+  if (form) form.closest('.front-body').dataset.editing = 'true';
+});
+document.querySelector('.fronts-list').addEventListener('submit', event => {
+  const form = event.target.closest('.front-entry-form');
+  if (!form) return;
+  event.preventDefault();
+  saveFrontRecord(form);
+});
 $('refresh-button').addEventListener('click',()=>load(true));
 $('pause-button').addEventListener('click',()=>{
   state.paused=!state.paused;
@@ -526,4 +666,4 @@ try { state.paused = localStorage.getItem('safe-pausado') === '1'; } catch {}
 try { const salvo = localStorage.getItem('safe-periodo'); if (salvo && (PERIODOS[salvo] || salvo === 'custom')) state.periodo = salvo; } catch {}
 aplicarPeriodo(state.periodo, { recarregar: false });
 state.filters = validateFilters(state.filters);
-syncControls(); syncPeriodo(); syncLive(); load();
+syncControls(); syncPeriodo(); syncLive(); checkEntryAccess(); load();

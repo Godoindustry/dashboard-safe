@@ -33,11 +33,13 @@ export function verifyAccessCode(value) {
 
 export function createSessionCookie() {
   const payload = Buffer.from(JSON.stringify({ scope: "reports", exp: Date.now() + 12 * 60 * 60 * 1000 })).toString("base64url");
-  return `${COOKIE_NAME}=${payload}.${signature(payload)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=43200`;
+  const secure = process.env.SAFE_LOCAL_DEV === "1" ? "" : "; Secure";
+  return `${COOKIE_NAME}=${payload}.${signature(payload)}; Path=/; HttpOnly${secure}; SameSite=Strict; Max-Age=43200`;
 }
 
 export function clearSessionCookie() {
-  return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
+  const secure = process.env.SAFE_LOCAL_DEV === "1" ? "" : "; Secure";
+  return `${COOKIE_NAME}=; Path=/; HttpOnly${secure}; SameSite=Strict; Max-Age=0`;
 }
 
 export function isReportAuthenticated(event) {

@@ -39,12 +39,12 @@ try{
       console.log('Configuração importada sem mostrar as chaves.');
     }
   }else{
-    console.log('Configure GROQ_DASHBOARD_API_KEY e GROQ_REPORT_API_KEY nas variáveis de ambiente do projeto, escopo Functions, contexto Production. Veja LEIA-ME.html.');
-    const ready=await prompt.question('As duas chaves já estão configuradas no Netlify? Digite SIM para continuar: ');
+    console.log('Configure as variáveis do Google Sheets, Google Drive, acesso protegido e, se usar IA, Groq. Veja .env.example e LEIA-ME.html.');
+    const ready=await prompt.question('As integrações e chaves já estão configuradas no Netlify? Digite SIM para continuar: ');
     if(ready.trim().toUpperCase()!=='SIM')process.exit(0);
   }
   const publish=await prompt.question('Publicar agora neste projeto? Digite PUBLICAR: ');
   if(publish.trim().toUpperCase()!=='PUBLICAR')process.exit(0);
   await cli('deploy','--prod','--context','production','--open');
-  console.log('Publicação concluída. Confira a leitura da planilha e envie uma pergunta curta à IA.');
+  console.log('Publicação concluída. Confira um lançamento de teste com foto, a planilha, a pasta do Drive e a página de relatórios.');
 }catch(error){console.error(error.message);process.exitCode=1;}finally{prompt.close();}

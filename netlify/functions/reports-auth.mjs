@@ -21,13 +21,13 @@ function tooManyAttempts(event) {
 }
 
 export async function handler(event) {
-  if (event.httpMethod === "GET") return reply(200, { protected: reportsProtectionEnabled(), authenticated: isReportAuthenticated(event) });
+  if (event.httpMethod === "GET") return reply(200, { protected: reportsProtectionEnabled(), authenticated: isReportAuthenticated(event), writeEnabled: Boolean(process.env.REPORTS_ACCESS_CODE && process.env.REPORTS_SESSION_SECRET) });
   if (event.httpMethod === "DELETE") return reply(200, { authenticated: false }, { "Set-Cookie": clearSessionCookie() });
   if (event.httpMethod !== "POST") return reply(405, { error: "Método não permitido." });
-  if (!reportsProtectionEnabled()) return reply(200, { protected: false, authenticated: true });
+  if (!reportsProtectionEnabled()) return reply(200, { protected: false, authenticated: true, writeEnabled: false });
   if (tooManyAttempts(event)) return reply(429, { error: "Muitas tentativas. Aguarde 15 minutos." });
   let body;
   try { body = JSON.parse(event.body || "{}"); } catch { return reply(400, { error: "Solicitação inválida." }); }
   if (!verifyAccessCode(String(body.code || "").slice(0, 100))) return reply(401, { error: "Código de acesso incorreto." });
-  return reply(200, { protected: true, authenticated: true }, { "Set-Cookie": createSessionCookie() });
+  return reply(200, { protected: true, authenticated: true, writeEnabled: Boolean(process.env.REPORTS_SESSION_SECRET) }, { "Set-Cookie": createSessionCookie() });
 }

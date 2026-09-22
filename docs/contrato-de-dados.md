@@ -44,3 +44,12 @@ Prioridade e Risco ausentes são exibidos como Não informado, sem inferência p
 - Quantidades devem ser números.
 - Não repita o cabeçalho no meio da tabela.
 - Novas linhas são reconhecidas automaticamente, sem alterar o dashboard.
+
+## Lançamentos feitos pelo site
+
+- Plano de Ação grava em **Pendências**.
+- Treinamentos/DDS grava em **DDS**.
+- As outras dez frentes gravam em **Inspeções por Setor**, usando o nome da frente em Item verificado.
+- O servidor lê a linha de cabeçalho já existente e encaixa os valores pelos nomes aceitos acima; colunas desconhecidas ficam vazias.
+- Cada envio recebe um ID único `SAFE-...`. O mesmo ID e os links privados das fotos ficam em Foto/Evidência ou Evidência, enquanto o Drive guarda ID, frente, data e setor nos metadados. Assim, o relatório associa as imagens ao lançamento correto mesmo quando há vários registros no mesmo dia.
+- A planilha precisa estar compartilhada como Editor com a conta de serviço configurada.

@@ -1,1 +1,37 @@
-<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DASHBOARD SAFE — Comece aqui</title><style>body{font:16px/1.65 system-ui,sans-serif;color:#18304a;background:#eef3f7;margin:0}main{max-width:850px;margin:40px auto;padding:40px;background:white;border-top:6px solid #f5b82e;border-radius:16px}h1{font-size:38px;line-height:1.1}h2{margin-top:32px;font-size:21px}li{margin:10px 0}a{color:#14689e}code{background:#edf2f6;padding:2px 5px;border-radius:4px}.notice{padding:16px;background:#fff4cf;border-radius:10px}.tag{color:#2878b5;font-weight:800;letter-spacing:.15em;font-size:12px}@media(max-width:600px){main{margin:0;padding:24px;border-radius:0}}</style><main><p class="tag">SAFE · SEGURANÇA DO TRABALHO</p><h1>DASHBOARD SAFE</h1><p>Planilha conectada. Indicadores interativos. IA integrada. Relatórios em PDF.</p><h2>Como publicar</h2><ol><li>Extraia o ZIP inteiro. Não envie só o HTML ou a pasta <code>dist</code>.</li><li>Instale o <a href="https://nodejs.org/">Node.js 24 LTS</a> e tenha uma conta <a href="https://app.netlify.com/">Netlify Free</a>.</li><li>Abra <strong>PUBLICAR-NETLIFY.cmd</strong>. O publicador vai orientar login, criação ou escolha do projeto e a publicação.</li><li>Na pasta local original, as duas chaves estão em <code>.env.local</code>; o publicador pode importá-las. O ZIP não contém chaves. Se estiver usando o ZIP, configure no Netlify as variáveis privadas <code>GROQ_DASHBOARD_API_KEY</code> (chave 2) e <code>GROQ_REPORT_API_KEY</code> (chave 1), escopo Functions, contexto Production.</li><li>Confirme o projeto certo, publique e abra o endereço informado. Confira uma pergunta curta na IA e baixe um PDF.</li></ol><div class="notice"><strong>Não há código de acesso à IA para o visitante.</strong> As chaves são configuradas uma vez no servidor, nunca nos arquivos públicos.</div><h2>O que está incluído</h2><p>Atualização por consulta a cada 15 s com a aba visível; filtros combináveis e vários meses; gráficos clicáveis; ordenação e paginação; modo claro/escuro; IA para dúvidas e organização da visualização, com desfazer; área de relatórios semanais e mensais, texto editável e download PDF sem limite artificial de 40 registros.</p><h2>Como usar a IA</h2><p>Exemplos: “Mostre as pendências vencidas”, “Filtre setembro de 2026 e ordene por prioridade”, “Qual é o resumo do período?” e “Ativar modo escuro”. Ela não altera o Google Sheets. As duas chaves compartilham uma proteção global de consumo.</p><h2>Cuidados para continuar gratuito</h2><p>IA limitada a 60 mil tokens reservados e até 30 chamadas por dia, com intervalo de 65 s. O limite que ocorrer primeiro interrompe novas chamadas. Gráficos e PDF comum não gastam tokens. Não habilite planos pagos ou recarga automática. O Netlify Free tem teto de uso e pode pausar se ele acabar; não existe garantia de acesso ilimitado gratuito.</p><h2>Antes de preencher dados pessoais</h2><p>A planilha contém absenteísmo. Use conta de serviço Google para leitura privada e retire o compartilhamento público antes de inserir nomes ou dados médicos. O dashboard remove esses campos, mas não muda o acesso ao documento original.</p><p>Os lançamentos são feitos no Sheets. Prioridade e risco aparecem como não informados se não forem preenchidos. A consulta não é instantânea: o Google pode acrescentar atraso. PDFs são prévias para revisão técnica e ficam no computador de quem os baixou.</p><h2>Detalhes e configuração</h2><p>Consulte o <a href="README.md">guia completo</a> e o <a href="docs/contrato-de-dados.md">modelo de preenchimento</a>. Para uma prévia local: na pasta do projeto, execute <code>npm ci</code>, <code>npm run build</code> e <code>npm start</code>, depois abra <a href="http://127.0.0.1:4174">o dashboard local</a>. O modo <code>/?demo=1</code> usa dados fictícios.</p></main></html>
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DASHBOARD SAFE — Comece aqui</title>
+<style>body{font:16px/1.65 system-ui,sans-serif;color:#18304a;background:#eef3f7;margin:0}main{max-width:850px;margin:40px auto;padding:40px;background:white;border-top:6px solid #f5b82e;border-radius:16px}h1{font-size:38px;line-height:1.1}h2{margin-top:32px;font-size:21px}li{margin:10px 0}a{color:#14689e}code{background:#edf2f6;padding:2px 5px;border-radius:4px}.notice{padding:16px;background:#fff4cf;border-radius:10px}.tag{color:#2878b5;font-weight:800;letter-spacing:.15em;font-size:12px}@media(max-width:600px){main{margin:0;padding:24px;border-radius:0}}</style>
+<main>
+  <p class="tag">SAFE · SEGURANÇA DO TRABALHO</p>
+  <h1>DASHBOARD SAFE</h1>
+  <p>Lançamentos pelo site. Planilha Google conectada. Fotos no Drive. Relatórios automáticos em PDF.</p>
+
+  <h2>Como publicar</h2>
+  <ol>
+    <li>Extraia o projeto inteiro. Não envie apenas o HTML ou a pasta <code>dist</code>, pois os lançamentos, fotos e agendamentos usam funções do servidor.</li>
+    <li>Instale o <a href="https://nodejs.org/">Node.js 24 LTS</a> e tenha uma conta <a href="https://app.netlify.com/">Netlify</a>.</li>
+    <li>Publique o repositório no Netlify e cadastre as variáveis descritas em <code>.env.example</code>.</li>
+    <li>Ative as APIs Google Sheets e Drive. Compartilhe a planilha como Editor com a conta de serviço.</li>
+    <li>Configure uma pasta privada do Drive. Para conta de serviço, use Drive compartilhado; para Meu Drive, use OAuth.</li>
+    <li>Defina <code>REPORTS_ACCESS_CODE</code> e <code>REPORTS_SESSION_SECRET</code>, publique e teste um lançamento com foto.</li>
+  </ol>
+
+  <div class="notice"><strong>Nunca coloque chaves dentro de <code>dist</code> ou no Git.</strong> Credenciais Google, Groq e o código de acesso pertencem às variáveis privadas do Netlify.</div>
+
+  <h2>Como funciona</h2>
+  <p>Abra uma das 12 frentes, preencha “Novo registro” e anexe até oito fotos. Plano de Ação entra em Pendências, Treinamentos/DDS entra em DDS e as demais frentes entram em Inspeções por Setor. As fotos são reduzidas antes do envio e ficam na pasta privada do Google Drive.</p>
+  <p>A pessoa precisa entrar em <code>/relatorios</code> antes de lançar ou visualizar evidências. O painel de leitura continua separado. Os relatórios manuais já puxam as fotos do período.</p>
+
+  <h2>Automação</h2>
+  <p>O relatório semanal é gerado toda sexta-feira às 16h. O mensal é gerado no último dia do mês às 15h. Os horários seguem São Paulo, as execuções repetidas não criam duplicatas e os PDFs são arquivados no Drive. Toda saída ainda exige revisão e aprovação técnica antes de distribuição externa.</p>
+
+  <h2>Cuidados</h2>
+  <p>Retire o compartilhamento público da planilha antes de incluir dados pessoais. Não fotografe documentos médicos, telas com dados pessoais ou pessoas sem base adequada. O site não oferece formulário de absenteísmo: esse conjunto sensível continua restrito à planilha.</p>
+
+  <h2>Detalhes e teste local</h2>
+  <p>Consulte o <a href="README.md">guia completo</a> e o <a href="docs/contrato-de-dados.md">contrato das abas</a>. Para prévia local: execute <code>npm ci</code>, <code>npm run build</code> e <code>npm start</code>, depois abra <a href="http://127.0.0.1:4174">o dashboard</a>. O modo <code>/?demo=1</code> usa dados fictícios e não grava.</p>
+</main>
+</html>

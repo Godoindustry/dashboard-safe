@@ -1,1 +1,6 @@
-/relatorios    /relatorios.html    200
+/api/dados                 /.netlify/functions/sheets-data       200
+/api/ia                    /.netlify/functions/ai                200
+/api/relatorios-acesso     /.netlify/functions/reports-auth      200
+/api/fotos                 /.netlify/functions/photos            200
+/api/registros             /.netlify/functions/records           200
+/relatorios                /relatorios.html                       200

@@ -21,7 +21,7 @@ export function createReportPdf(report) {
   paragraph('SAFE',11,true);
   paragraph(report.title,15,true);
   paragraph('Registro de Condições Observadas e Ações Corretivas',9);
-  paragraph(report.demo?'DEMONSTRAÇÃO — DADOS FICTÍCIOS. NÃO UTILIZAR COMO RELATÓRIO REAL.':'PRÉVIA — Revisão e aprovação técnica necessárias antes da emissão.',9,true);
+  paragraph(report.demo?'DEMONSTRAÇÃO — DADOS FICTÍCIOS. NÃO UTILIZAR COMO RELATÓRIO REAL.':report.automatic?'GERADO AUTOMATICAMENTE — Revisão e aprovação técnica necessárias antes da distribuição.':'PRÉVIA — Revisão e aprovação técnica necessárias antes da emissão.',9,true);
   table(['Empresa','Responsável','Período'],[['SAFE',text(report.owner),report.period]]);
   paragraph(`Recorte: ${report.filterLabel}`,8);
   paragraph(`Dados consultados em: ${new Date(report.generatedAt || report.emittedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}`,8);
@@ -52,21 +52,25 @@ export function createReportPdf(report) {
   if(photos.length){
     heading('9. REGISTRO FOTOGRÁFICO');
     paragraph('Imagens anexadas pela pessoa responsável. Confirme que nenhuma delas expõe dados pessoais ou informações médicas antes de distribuir o documento.',8);
+    let currentFront='';
     photos.forEach((photo,index)=>{
+      if(photo.frontLabel&&photo.frontLabel!==currentFront){currentFront=photo.frontLabel;heading(`Frente: ${text(currentFront)}`);}
       const ratio=photo.height&&photo.width?photo.height/photo.width:0.75;
       const boxWidth=Math.min(width,120);
       let drawWidth=boxWidth, drawHeight=boxWidth*ratio;
       if(drawHeight>95){drawHeight=95;drawWidth=drawHeight/ratio;}
       if(y+drawHeight+12>bottom)page();
-      try{doc.addImage(photo.dataUrl,'JPEG',margin,y,drawWidth,drawHeight,`foto-${index}`,'MEDIUM');}
+      const format=photo.dataUrl.startsWith('data:image/png')?'PNG':photo.dataUrl.startsWith('data:image/webp')?'WEBP':'JPEG';
+      try{doc.addImage(photo.dataUrl,format,margin,y,drawWidth,drawHeight,`foto-${index}`,'MEDIUM');}
       catch{paragraph(`Foto ${index+1} não pôde ser incorporada ao PDF.`,8);return;}
       y+=drawHeight+4;
-      paragraph(`Foto ${index+1}${photo.caption?` — ${text(photo.caption)}`:''}`,8);
+      const context=[photo.frontLabel,photo.sector,photo.date?formatDate(photo.date):''].filter(Boolean).map(text).join(' · ');
+      paragraph(`Foto ${index+1}${context?` — ${context}`:''}${photo.caption?` — ${text(photo.caption)}`:''}${photo.recordId?` · ID ${text(photo.recordId)}`:''}`,8);
     });
   }
   if(y+32>bottom)page(); y+=12;doc.setDrawColor(110,120,130);doc.line(margin,y,margin+90,y);y+=5;paragraph(`Responsável: ${text(report.owner)}`);paragraph('Revisão / aprovação: ____________________     Data: ____/____/________',8);
   const count=doc.getNumberOfPages();
-  for(let i=1;i<=count;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(100);doc.text(`SAFE | ${report.demo?'DEMONSTRAÇÃO':'PRÉVIA PARA REVISÃO'} | ${report.period}`,margin,268);doc.text(`${i} / ${count}`,198,268,{align:'right'});}
+  for(let i=1;i<=count;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(100);doc.text(`SAFE | ${report.demo?'DEMONSTRAÇÃO':report.automatic?'AUTOMÁTICO PARA REVISÃO':'PRÉVIA PARA REVISÃO'} | ${report.period}`,margin,268);doc.text(`${i} / ${count}`,198,268,{align:'right'});}
   return doc;
 }
 export function downloadReport(report) { createReportPdf(report).save(`SAFE_${report.type==='monthly'?'Mensal':'Semanal'}_${report.filters.start}${report.demo?'_DEMONSTRACAO':''}.pdf`); }

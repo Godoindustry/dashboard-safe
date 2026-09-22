@@ -15,8 +15,10 @@ Se publicar por Git: base desta pasta (`DASHBOARD SAFE` em um repositório que t
 - Consulta automática a cada 15 segundos enquanto a aba está visível, com pausa, atualização manual, preservação de filtros e aviso quando só a última leitura estiver disponível.
 - Filtros combináveis por múltiplos meses, datas, setor, status, prioridade, busca, turno, registro de DDS e prazo vencido. Clique nas barras/legendas para filtrar. Explorador por tipo, ordenação e paginação, sem limitar o total a oito registros.
 - Temas claro e escuro, preferência salva no navegador.
-- IA sem senha de visitante: analisa indicadores e organiza a visualização por comandos. Alterações visuais podem ser desfeitas. Não edita a planilha, não cria fatos nem toma decisões de segurança no lugar de um responsável.
-- Área separada `/relatorios`: semanal (segunda–domingo) e mensal, filtros, observações editáveis e download PDF paginado. PDF não usa IA obrigatoriamente. A análise gerada permanece no PDF.
+- IA sem senha de visitante: analisa indicadores e organiza a visualização por comandos. Alterações visuais podem ser desfeitas. Não cria fatos nem toma decisões de segurança no lugar de um responsável.
+- Cada uma das 12 frentes possui formulário de lançamento. O site grava inspeções, pendências ou DDS na aba correspondente da planilha Google e envia as fotos reduzidas para uma pasta privada do Google Drive.
+- Área separada `/relatorios`: semanal (segunda–domingo) e mensal, filtros, fotos do Drive, observações editáveis e download PDF paginado. PDF não usa IA obrigatoriamente.
+- Relatório semanal automático toda sexta-feira às 16h e mensal automático no último dia do mês às 15h, sempre no fuso `America/Sao_Paulo`. Os PDFs são arquivados no Drive sem duplicar uma mesma competência.
 - Relatórios seguem a estrutura do Word fornecido, com indicadores e DDS acrescentados. Referências normativas são as do modelo, não certificação de conformidade. Toda saída é uma prévia para revisão/aprovação técnica.
 
 ## Integração e chaves
@@ -26,6 +28,16 @@ Se publicar por Git: base desta pasta (`DASHBOARD SAFE` em um repositório que t
 Na cópia local, as chaves fornecidas estão em `.env.local`, ignorado pelo Git e excluído do ZIP. O publicador pode importar esse arquivo para variáveis do Netlify, sem imprimir valores. Em uma cópia extraída do ZIP, cadastre as duas variáveis no Netlify (escopo Functions, contexto Production), ou copie seu `.env.local` privado para a raiz antes de publicar. Nunca o coloque dentro de `dist`. Como as chaves foram compartilhadas em conversa, é recomendável substituí-las no Groq antes de distribuir o projeto.
 
 O painel não precisa de banco de dados externo pago. Netlify Blobs guarda apenas um pequeno contador global de consumo, sem conversas nem dados da planilha. Se esse contador estiver indisponível, a IA bloqueia a chamada para não gastar sem controle.
+
+### Google Drive e gravação pelo site
+
+Ative as APIs Google Sheets e Google Drive. A planilha deve ser compartilhada como **Editor** com `GOOGLE_SERVICE_ACCOUNT_EMAIL`. Para o Drive, escolha um destes modos:
+
+- Google Workspace com Drive compartilhado: adicione a conta de serviço como colaboradora e configure `GOOGLE_DRIVE_SHARED_DRIVE_ID` e `GOOGLE_DRIVE_FOLDER_ID`.
+- Google Workspace com delegação no domínio: configure `GOOGLE_DRIVE_IMPERSONATE_EMAIL` e a delegação administrativa para o escopo Drive.
+- Meu Drive de uma pessoa: configure `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET` e `GOOGLE_DRIVE_REFRESH_TOKEN`, além de `GOOGLE_DRIVE_FOLDER_ID`.
+
+Contas de serviço não possuem cota própria para serem donas de arquivos em “Meu Drive”; sem Drive compartilhado ou impersonação, use OAuth. Também configure obrigatoriamente `REPORTS_ACCESS_CODE` e um `REPORTS_SESSION_SECRET` longo: eles protegem os lançamentos e as fotos. `REPORT_OWNER` define o responsável mostrado nos PDFs automáticos.
 
 ## Atualização e limites Free
 
@@ -39,7 +51,7 @@ Referências oficiais consultadas em 11/09/2026: [Netlify Free](https://www.netl
 
 ## Dados e privacidade
 
-Planilha configurada: `1BcHzuaOFOm2MMs11l-BNBzMmlnzdHdPrnhSnIPk7z30`. Abas: Inspeções por Setor, DDS, Absenteísmo e Pendências. Nenhum dado foi inserido ou alterado na planilha. Indicativo Diário é um formulário sem histórico; Resumo Mensal não substitui as linhas de origem. Novos lançamentos nas quatro abas alimentam o painel.
+Planilha configurada: `1BcHzuaOFOm2MMs11l-BNBzMmlnzdHdPrnhSnIPk7z30`. Abas estruturadas: Inspeções por Setor, DDS, Absenteísmo e Pendências; também são lidas Indicativo Diário, Resumo Mensal e Inspeção de EPI. O formulário do site envia Plano de Ação para Pendências, Treinamentos/DDS para DDS e as demais frentes para Inspeções por Setor. O site não lança dados médicos de absenteísmo.
 
 As colunas atuais são aceitas. Adicione **Risco** e **Prioridade** às inspeções e **Prioridade** às pendências para preencher esses campos; caso contrário aparecem como não informados. Veja `docs/contrato-de-dados.md`.
 
@@ -47,12 +59,12 @@ Taxa de resolução e alertas contam somente a aba Pendências: uma inspeção e
 
 Nomes, CID, motivos e descrição médica da aba Absenteísmo não são enviados ao navegador ou ao Groq. O navegador recebe data, setor, dias e comunicação, não anonimização irreversível. Textos livres de inspeções e pendências são mostrados no painel: não inclua informações pessoais neles. A IA recebe somente agregados e filtros.
 
-**Antes de registrar dados pessoais na planilha, retire o compartilhamento público** e configure leitura privada por conta de serviço Google: ative a API Google Sheets, compartilhe a planilha como Leitor com o e-mail da conta e preencha `GOOGLE_SERVICE_ACCOUNT_EMAIL` e `GOOGLE_PRIVATE_KEY` no Netlify. Apenas uma das duas preenchida causa bloqueio, sem fallback público. Enquanto não configuradas, usa leitura pública da planilha. O link público original permite ver a planilha fora do dashboard; o painel não corrige esse compartilhamento.
+**Antes de registrar dados pessoais na planilha, retire o compartilhamento público** e configure a conta de serviço Google: compartilhe a planilha como Editor com o e-mail da conta e preencha `GOOGLE_SERVICE_ACCOUNT_EMAIL` e `GOOGLE_PRIVATE_KEY` no Netlify. Apenas uma das duas preenchida causa bloqueio. O link público original permite ver a planilha fora do dashboard; o painel não corrige esse compartilhamento.
 
-A área de relatórios é separada, mas não é restrita por padrão. Para proteção opcional configure `REPORTS_ACCESS_CODE` e `REPORTS_SESSION_SECRET` (segredo aleatório longo). Isso protege relatórios, não adiciona código à IA do dashboard. PDFs baixados ficam no computador do usuário; não há arquivo histórico de PDFs em nuvem. O histórico de versões do Sheets ajuda na recuperação, mas não substitui backup independente.
+A leitura pública do painel continua separada dos lançamentos. Para gravar registros ou abrir fotos, a pessoa precisa entrar em `/relatorios`; o cookie protegido vale para todo o site por 12 horas. Os PDFs manuais ficam no computador, e os PDFs automáticos são arquivados na pasta configurada do Drive. As imagens não são publicadas por URL aberta: passam por uma função autenticada.
 
 ## Desenvolvimento e verificação
 
 `npm ci`, `npm run build`, `npm run check`, `npm test`, `npm start`. Prévia local em `http://127.0.0.1:4174`; `/?demo=1` mostra dados fictícios explicitamente identificados. Abra pelo servidor, não diretamente por `file://`. O servidor local nunca expõe `.env.local` e só aceita conexões de loopback. Seu contador persistente de teste fica em `.local-state`, fora da publicação.
 
-Os testes cobrem datas, filtros, métricas sem dupla contagem, cabeçalhos reais, remoção de campos sensíveis, comandos permitidos, concorrência do orçamento, separação das chaves e PDF multipágina. A publicação e a configuração da conta Netlify precisam ser verificadas após o primeiro deploy.
+Os testes cobrem datas, filtros, métricas sem dupla contagem, cabeçalhos reais, remoção de campos sensíveis, comandos permitidos, concorrência do orçamento, separação das chaves, PDF multipágina, roteamento dos lançamentos, validação de imagens e horários dos relatórios automáticos. A publicação e as permissões Google precisam ser verificadas após o primeiro deploy.

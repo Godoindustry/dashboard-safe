@@ -38,6 +38,7 @@
         <div><p class="eyebrow">Área exclusiva</p><h1>Relatórios semanais e mensais</h1></div>
         <div class="toolbar"><button class="button secondary" id="ai-report-button" type="button">Gerar análise com IA</button><button class="button primary" id="print-button" type="button">Salvar em PDF</button></div>
       </div>
+      <div class="report-status no-print automation-notice"><strong>Automação ativa:</strong> semanal toda sexta às 16h e mensal no último dia às 15h, sempre no horário de São Paulo. Os PDFs e as fotos ficam no Google Drive.</div>
 
       <section class="report-controls no-print" aria-label="Configuração do relatório">
         <div class="segmented" role="group" aria-label="Tipo de relatório">
@@ -61,8 +62,8 @@
         <label for="report-photos">Fotos do relatório — anexe as imagens que devem sair no PDF
           <input id="report-photos" type="file" accept="image/png,image/jpeg,image/webp" multiple>
         </label>
-        <p class="filter-note" id="report-photo-count">Nenhuma foto anexada. O PDF é gerado normalmente sem elas.</p>
-        <p class="filter-note">As fotos ficam somente neste navegador e são gravadas dentro do PDF que você baixar. Nada é enviado para a internet. Confira se nenhuma imagem mostra dados pessoais ou informações médicas.</p>
+        <p class="filter-note" id="report-photo-count">Buscando no Google Drive as fotos deste período.</p>
+        <p class="filter-note">As fotos lançadas nas frentes são buscadas automaticamente no Google Drive. Você ainda pode acrescentar imagens somente para esta prévia. Confira se nenhuma imagem mostra dados pessoais ou informações médicas.</p>
         <div class="photo-grid" id="report-photo-list"></div>
       </section>
 

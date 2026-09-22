@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readWorkbook } from './google-sheets.mjs';
 import { containsSensitiveAbsenceFields, transformWorkbook } from './data.mjs';
 let cached, inFlight;
+export function invalidateSnapshot() { cached = undefined; }
 export async function getSnapshot(detail = 'public') {
   if (!cached || Date.now() - cached.time >= 10000) {
     if (!inFlight) inFlight = readWorkbook(process.env.GOOGLE_SHEET_ID || '1BcHzuaOFOm2MMs11l-BNBzMmlnzdHdPrnhSnIPk7z30')

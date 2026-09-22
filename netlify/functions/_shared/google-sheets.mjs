@@ -6,7 +6,12 @@ export const SHEETS = {
   dds: process.env.SHEET_DDS_NAME || "DDS",
   absences: process.env.SHEET_ABSENCES_NAME || "Absenteísmo",
   pending: process.env.SHEET_PENDING_NAME || "Pendências",
+  daily: process.env.SHEET_DAILY_NAME || "Indicativo Diário",
+  summary: process.env.SHEET_SUMMARY_NAME || "Resumo Mensal",
+  epi: process.env.SHEET_EPI_NAME || "Inspeção de EPI",
 };
+
+const STRUCTURED_KEYS = new Set(["inspections", "dds", "absences", "pending"]);
 
 let tokenCache = { token: "", expiresAt: 0 };
 
@@ -22,7 +27,7 @@ async function serviceAccountToken() {
   const now = Math.floor(Date.now() / 1000);
   const unsigned = `${base64url({ alg: "RS256", typ: "JWT" })}.${base64url({
     iss: email,
-    scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
+    scope: "https://www.googleapis.com/auth/spreadsheets",
     aud: "https://oauth2.googleapis.com/token",
     iat: now,
     exp: now + 3600,
@@ -51,7 +56,10 @@ async function fetchPrivateSheets(spreadsheetId) {
   }
   const body = await response.json();
   const result = {};
-  Object.keys(SHEETS).forEach((key, index) => { result[key] = rowsToObjects(body.valueRanges?.[index]?.values || []); });
+  Object.keys(SHEETS).forEach((key, index) => {
+    const rows = body.valueRanges?.[index]?.values || [];
+    result[key] = STRUCTURED_KEYS.has(key) ? rowsToObjects(rows) : rows;
+  });
   return result;
 }
 
@@ -74,16 +82,92 @@ function parseGviz(body) {
   })));
 }
 
-async function fetchPublicSheet(spreadsheetId, sheetName) {
-  const params = new URLSearchParams({ tqx: "out:json", headers: "1", sheet: sheetName });
+function parseGvizRows(body) {
+  const start = body.indexOf("{");
+  const end = body.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("A planilha não está disponível para leitura pública.");
+  const json = body.slice(start, end + 1).replace(/("(?:\\.|[^"\\])*")|Date\(\d+,\d+,\d+(?:,\d+,\d+,\d+)?\)/g, (match, quoted) => quoted || JSON.stringify(match));
+  const parsed = JSON.parse(json);
+  if (parsed.status === "error") throw new Error("O Google recusou a leitura da planilha.");
+  const width = (parsed.table?.cols || []).length;
+  return (parsed.table?.rows || []).map((row) => Array.from({ length: width }, (_, index) => String(row.c?.[index]?.f ?? row.c?.[index]?.v ?? "")));
+}
+
+async function fetchPublicSheet(spreadsheetId, sheetName, raw = false) {
+  const params = new URLSearchParams({ tqx: "out:json", headers: raw ? "0" : "1", sheet: sheetName });
   const response = await fetch(`https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq?${params}`, { signal: AbortSignal.timeout(10000), headers: { "User-Agent": "SAFE-Dashboard/2.0" } });
   if (!response.ok) throw new Error(`A aba ${sheetName} não pôde ser lida (${response.status}).`);
-  return parseGviz(await response.text());
+  const body = await response.text();
+  return raw ? parseGvizRows(body) : parseGviz(body);
 }
 
 async function fetchPublicSheets(spreadsheetId) {
-  const entries = await Promise.all(Object.entries(SHEETS).map(async ([key, name]) => [key, await fetchPublicSheet(spreadsheetId, name)]));
+  const entries = await Promise.all(Object.entries(SHEETS).map(async ([key, name]) => [key, await fetchPublicSheet(spreadsheetId, name, !STRUCTURED_KEYS.has(key))]));
   return Object.fromEntries(entries);
+}
+
+function normalized(value = "") {
+  return String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+const FIELD_ALIASES = {
+  date: ["data", "data inspecao", "data da inspecao", "data registro"],
+  time: ["horario"],
+  sector: ["setor", "local", "area"],
+  item: ["item verificado", "item"],
+  description: ["situacao encontrada", "situacao encontra", "condicao observada", "nao conformidade problema", "nao conformidade", "pendencia", "descricao"],
+  topic: ["tema do dds", "tema"],
+  risk: ["risco", "risco observado"],
+  action: ["acao necessaria", "acao corretiva", "tratativa"],
+  due: ["prazo", "data limite", "vencimento"],
+  status: ["status", "situacao atual"],
+  priority: ["prioridades", "prioridade", "criticidade"],
+  conformity: ["situacao", "conformidade"],
+  owner: ["responsavel"],
+  evidence: ["foto evidencia", "evidencia", "foto"],
+  notes: ["observacoes", "observacao"],
+  origin: ["origem", "tipo"],
+  shift: ["turno"],
+  participants: ["participantes", "quantidade de participantes", "qtd participantes"],
+  registered: ["registro realizado", "registrado"],
+};
+
+function valueForHeader(header, values) {
+  const key = normalized(header);
+  const field = Object.entries(FIELD_ALIASES).find(([, aliases]) => aliases.includes(key))?.[0];
+  return field ? values[field] ?? "" : "";
+}
+
+export async function appendSiteRecord(spreadsheetId, sheetKey, values) {
+  if (!STRUCTURED_KEYS.has(sheetKey) || sheetKey === "absences") throw new Error("Destino de lançamento inválido.");
+  const sheetName = SHEETS[sheetKey];
+  const token = await serviceAccountToken();
+  const safeSheet = `'${sheetName.replaceAll("'", "''")}'`;
+  const headerResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(`${safeSheet}!1:20`)}?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE`, {
+    signal: AbortSignal.timeout(10000),
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!headerResponse.ok) throw new Error(`A aba ${sheetName} não pôde ser preparada para gravação.`);
+  const rows = (await headerResponse.json()).values || [];
+  const required = sheetKey === "dds" ? ["data", "tema"] : ["data", "setor"];
+  const headers = rows.find((row) => {
+    const normalizedRow = row.map(normalized);
+    return required.every((needle) => normalizedRow.some((cell) => cell === needle || cell.includes(needle)));
+  }) || rows.find((row) => row.some((cell) => String(cell || "").trim()));
+  if (!headers?.length) throw new Error(`A aba ${sheetName} precisa ter uma linha de cabeçalho antes de receber lançamentos.`);
+  const row = headers.map((header) => valueForHeader(header, values));
+  const params = new URLSearchParams({ valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" });
+  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(`${safeSheet}!A:Z`)}:append?${params}`, {
+    signal: AbortSignal.timeout(12000),
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ majorDimension: "ROWS", values: [row] }),
+  });
+  if (!response.ok) {
+    if (response.status === 403) throw new Error("A conta de serviço precisa de permissão de Editor na planilha Google.");
+    throw new Error(`O Google Sheets recusou o lançamento (${response.status}).`);
+  }
+  return response.json();
 }
 
 export async function readWorkbook(spreadsheetId) {
@@ -93,4 +177,4 @@ export async function readWorkbook(spreadsheetId) {
   return { data, mode: privateMode ? "service-account" : "public-view" };
 }
 
-export { parseGviz };
+export { parseGviz, parseGvizRows };
