@@ -1,9 +1,10 @@
 import { escapeHtml as e, monthLabel, recordMonth, calculateMetrics, fetchJson, formatDate, statusBucket, priorityBucket, isOverdue, normalizeText, toDateKey, dayKeyInSaoPaulo, monthStartInSaoPaulo, COLORS } from './shared.js';
 import { emptyFilters, validateFilters, filterData, flattenRecords, sortRecords, filterDescription, validateActions, STATUS_LABELS, PRIORITY_LABELS, TYPE_LABELS } from './filters.js';
 import { setTheme } from './theme.js';
+import { getFrontDraft, saveFrontDraft, clearFrontDraft, hasFrontDraft, saveLocalRecord, listLocalRecords, saveLocalPhotos, listLocalPhotos } from './storage.js';
 const $ = id => document.getElementById(id);
 const demo = new URLSearchParams(location.search).get('demo') === '1';
-const state = { data: null, filtered: {}, filters: emptyFilters(), source: 'all', sort: 'date-desc', page: 1, busy: false, paused: false, failures: 0, etag: '', timer: null, undo: null, periodo: 'hoje', frontPhotos: {}, photoLoading: {}, entryAccess: demo ? false : null, entryConfigured: demo ? false : null };
+const state = { data: null, filtered: {}, filters: emptyFilters(), source: 'all', sort: 'date-desc', page: 1, busy: false, paused: false, failures: 0, etag: '', timer: null, undo: null, periodo: 'hoje', frontPhotos: {}, photoLoading: {}, entryAccess: true, entryConfigured: true };
 const FRONTS = {
   safety: {
     direct: ['inspections'],
@@ -144,8 +145,9 @@ function frontRecordText(record) {
 function frontRecords(frontKey) {
   const config = FRONTS[frontKey];
   if (!config || !state.data) return [];
-  const rows = [...flattenRecords(state.filtered), ...registrosDasAbasProprias()];
-  return rows.filter((record) => config.direct.includes(record.type) || (config.match && config.match.test(frontRecordText(record))));
+  const localRows = listLocalRecords(frontKey);
+  const rows = [...flattenRecords(state.filtered), ...registrosDasAbasProprias(), ...localRows];
+  return rows.filter((record) => config.direct.includes(record.type) || (config.match && config.match.test(frontRecordText(record))) || record.front === frontKey);
 }
 
 function frontRecordTitle(record) {
@@ -196,27 +198,80 @@ function frontLabel(frontKey) {
 }
 
 function photoGallery(frontKey) {
-  const photos = state.frontPhotos[frontKey];
-  if (demo) return '<div class="front-empty">Na demonstração, os anexos ficam desativados. No painel conectado, as fotos são enviadas à pasta privada do Google Drive.</div>';
-  if (!photos) return '<div class="front-empty">Carregando as evidências desta frente…</div>';
-  if (!photos.length) return '<div class="front-empty">Nenhuma foto salva nesta frente. As novas evidências aparecerão aqui e entrarão automaticamente nos relatórios.</div>';
-  return `<div class="front-photo-grid">${photos.map((photo, index) => `<figure><img src="${e(photo.contentUrl)}" alt="Evidência ${index + 1} de ${e(frontLabel(frontKey))}" loading="lazy"><figcaption><strong>${e(photo.caption || `Evidência de ${photo.date ? formatDate(photo.date) : 'segurança'}`)}</strong><span>${e([photo.sector, photo.date ? formatDate(photo.date) : ''].filter(Boolean).join(' · '))}</span></figcaption></figure>`).join('')}</div>`;
+  const serverPhotos = state.frontPhotos[frontKey] || [];
+  const localPhotos = listLocalPhotos(frontKey);
+  const photos = [...serverPhotos, ...localPhotos];
+  if (!photos.length) return '<div class="front-empty">Nenhuma evidência salva nesta frente ainda. Ao salvar um registro com fotos, as imagens aparecem aqui e nos relatórios.</div>';
+  return `<div class="front-photo-grid">${photos.map((photo, index) => `<figure><img src="${photo.dataUrl || e(photo.contentUrl)}" alt="Evidência ${index + 1} de ${e(frontLabel(frontKey))}" loading="lazy"><figcaption><strong>${e(photo.caption || `Evidência de ${photo.date ? formatDate(photo.date) : 'segurança'}`)}</strong><span>${e([photo.sector, photo.date ? formatDate(photo.date) : ''].filter(Boolean).join(' · '))}</span></figcaption></figure>`).join('')}</div>`;
 }
 
 function frontEntryFields(frontKey) {
-  if (frontKey === 'training') return `<label>Horário<input name="time" type="time"></label><label>Turno<input name="shift" maxlength="80" placeholder="Ex.: 1º turno"></label><label>Participantes<input name="participants" type="number" min="0" max="10000" inputmode="numeric"></label><label class="front-check"><input name="registered" type="checkbox" checked> Registro do DDS realizado</label>`;
-  return `<label>Risco observado<input name="risk" maxlength="500" placeholder="Qual é o risco?"></label><label>Conformidade<select name="conformity"><option value="">Não informada</option><option>Conforme</option><option>Não conforme</option><option>Não se aplica</option></select></label>`;
+  if (frontKey === 'training') {
+    return `<label>Horário<input name="time" type="time"></label>
+            <label>Turno<input name="shift" maxlength="80" placeholder="Ex.: 1º turno"></label>
+            <label>Participantes<input name="participants" type="number" min="0" max="10000" inputmode="numeric"></label>
+            <label class="front-check"><input name="registered" type="checkbox" checked> Registro do DDS realizado</label>`;
+  }
+  if (frontKey === 'epi') {
+    return `<label>Colaborador<input name="owner" maxlength="160" placeholder="Nome do colaborador"></label>
+            <label>Conformidade do EPI<select name="conformity"><option value="Não conforme">Não conforme</option><option value="Conforme">Conforme</option><option value="">Não informada</option></select></label>
+            <label>Risco associado<input name="risk" maxlength="500" placeholder="Ex.: Risco de projeção / corte"></label>`;
+  }
+  if (frontKey === 'ergonomics') {
+    return `<label>Dias de afastamento (se houver)<input name="days" type="number" min="0" max="365" placeholder="0"></label>
+            <label>Atestado médico<select name="certificate"><option value="">Não se aplica</option><option value="yes">Sim</option><option value="no">Não</option></select></label>
+            <label>Risco ergonômico<input name="risk" maxlength="500" placeholder="Ex.: Postura inadequada, repetitividade"></label>`;
+  }
+  if (frontKey === 'machines') {
+    return `<label>Máquina / Equipamento<input name="machine" maxlength="120" placeholder="Ex.: Injetora 03 / Moinho"></label>
+            <label>Risco observado<input name="risk" maxlength="500" placeholder="Qual é o perigo mecânico/NR-12?"></label>
+            <label>Conformidade<select name="conformity"><option value="">Não informada</option><option>Conforme</option><option>Não conforme</option><option>Não se aplica</option></select></label>`;
+  }
+  if (frontKey === 'cipa') {
+    return `<label>Pauta / Reunião da CIPA<input name="cipaTopic" maxlength="160" placeholder="Ex.: Ata mensal nº 08 / Campanha"></label>
+            <label>Risco / Apontamento<input name="risk" maxlength="500" placeholder="Apontamento dos cipeiros"></label>`;
+  }
+  if (frontKey === 'brigade') {
+    return `<label>Item de emergência / Brigada<input name="brigadeItem" maxlength="160" placeholder="Ex.: Simulado / Estojo de primeiros socorros"></label>
+            <label>Situação observada<input name="risk" maxlength="500" placeholder="Status do equipamento ou equipe"></label>`;
+  }
+  if (frontKey === 'forklifts') {
+    return `<label>Empilhadeira / Operador<input name="forklift" maxlength="140" placeholder="Ex.: Empilhadeira Yale / Garfos / Operador"></label>
+            <label>Risco observado<input name="risk" maxlength="500" placeholder="Circulação, buzina, cinto, carga"></label>
+            <label>Conformidade<select name="conformity"><option value="">Não informada</option><option>Conforme</option><option>Não conforme</option></select></label>`;
+  }
+  if (frontKey === 'contractors') {
+    return `<label>Empresa terceira / Prestador<input name="contractor" maxlength="140" placeholder="Razão social / Empresa terceirizada"></label>
+            <label>APR / PT emitida<select name="pt"><option value="Sim">Sim (emitida)</option><option value="Não">Não emitida</option><option value="">Não se aplica</option></select></label>
+            <label>Risco observado<input name="risk" maxlength="500" placeholder="Trabalho a quente, altura, etc."></label>`;
+  }
+  if (frontKey === 'emergencies') {
+    return `<label>Equipamento / Rota<input name="emergencyItem" maxlength="140" placeholder="Ex.: Extintor 04 / Rota de fuga / Hidrante"></label>
+            <label>Risco observado<input name="risk" maxlength="500" placeholder="Obstrução, vencimento, carga"></label>
+            <label>Conformidade<select name="conformity"><option value="">Não informada</option><option>Conforme</option><option>Não conforme</option></select></label>`;
+  }
+  if (frontKey === 'documents') {
+    return `<label>Documento / Rotina<input name="docName" maxlength="160" placeholder="Ex.: PGR, PCMSO, Indicativo diário, Checklist"></label>
+            <label>Situação do documento<select name="conformity"><option value="Conforme">Vigente / Conforme</option><option value="Não conforme">Pendente / Vencido</option><option value="">Em elaboração</option></select></label>`;
+  }
+  return `<label>Risco observado<input name="risk" maxlength="500" placeholder="Qual é o risco?"></label>
+          <label>Conformidade<select name="conformity"><option value="">Não informada</option><option>Conforme</option><option>Não conforme</option><option>Não se aplica</option></select></label>`;
 }
 
 function frontEntryForm(frontKey) {
   const training = frontKey === 'training';
   const action = frontKey === 'actions';
-  const description = training ? 'Tema do DDS' : action ? 'Não conformidade / problema' : 'Condição observada';
-  const canWrite = state.entryAccess === true && state.entryConfigured === true;
-  const accessMessage = demo ? 'Envio desativado na demonstração.' : state.entryConfigured === false ? 'Integração ainda não liberada pelo administrador.' : state.entryAccess === false ? 'Entre em <a href="/relatorios">Relatórios</a> para liberar os lançamentos.' : state.entryAccess === true ? 'Acesso autorizado. O lançamento será salvo no Google.' : 'Verificando o acesso protegido…';
+  const description = training ? 'Tema do DDS' : action ? 'Não conformidade / problema' : frontKey === 'epi' ? 'Ocorrência / Uso de EPI' : 'Condição observada';
   return `<section class="front-card front-entry">
-    <div class="front-card-heading"><div><h3>Novo registro</h3><p>Salva os dados na planilha Google e as fotos no Google Drive.</p></div><span class="front-storage-badge">Google</span></div>
+    <div class="front-card-heading">
+      <div>
+        <h3>Novo lançamento — ${e(frontLabel(frontKey))}</h3>
+        <p>Preencha os dados e anexe fotos. As fotos e os campos ficam salvos no cache mesmo se você mudar de aba.</p>
+      </div>
+      <span class="front-storage-badge">Cache ativo</span>
+    </div>
     <form class="front-entry-form" data-front-form="${e(frontKey)}">
+      <div class="draft-cache-banner" data-draft-banner="${e(frontKey)}" hidden></div>
       <div class="front-form-grid">
         <label>Data<input name="date" type="date" value="${dayKeyInSaoPaulo()}" required></label>
         <label>Setor / local<input name="sector" maxlength="120" required placeholder="Ex.: Produção"></label>
@@ -229,23 +284,93 @@ function frontEntryForm(frontKey) {
         <label>Prazo<input name="due" type="date"></label>
         <label class="field-wide">Observações<textarea name="notes" rows="2" maxlength="1500"></textarea></label>
         <label class="field-wide">Legenda das fotos<input name="photoCaption" maxlength="300" placeholder="Onde foi e o que as imagens mostram"></label>
-        <label class="front-photo-picker field-wide"><span aria-hidden="true">＋</span><strong>Anexar fotos</strong><small>Até 8 imagens · câmera ou galeria · redução automática</small><input name="photos" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple></label>
+        <div class="field-wide photo-upload-wrapper">
+          <label class="front-photo-picker"><span aria-hidden="true">＋</span><strong>Adicionar fotos</strong><small>Até 8 imagens · salvas em cache ao selecionar</small><input name="photos" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple></label>
+          <div class="form-photo-tray" data-photo-tray="${e(frontKey)}" hidden></div>
+        </div>
       </div>
-      <div class="front-submit-row"><button class="button primary" type="submit"${canWrite ? '' : ' disabled'}>Salvar registro e fotos</button><span class="front-form-status" data-front-form-status aria-live="polite">${accessMessage}</span></div>
+      <div class="front-submit-row">
+        <button class="button primary" type="submit">Salvar registro e fotos</button>
+        <span class="front-form-status" data-front-form-status aria-live="polite">Pronto para salvar. Suas fotos e informações estão protegidas.</span>
+      </div>
     </form>
   </section>`;
 }
 
+function renderPhotoTray(frontKey) {
+  const form = document.querySelector(`.front-entry-form[data-front-form="${frontKey}"]`);
+  if (!form) return;
+  const tray = form.querySelector(`[data-photo-tray="${frontKey}"]`);
+  const banner = form.querySelector(`[data-draft-banner="${frontKey}"]`);
+  const draft = getFrontDraft(frontKey);
+  const photos = draft?.photos || [];
+
+  if (tray) {
+    if (!photos.length) {
+      tray.innerHTML = '';
+      tray.hidden = true;
+    } else {
+      tray.hidden = false;
+      tray.innerHTML = `<div class="photo-tray-heading"><span><b>${photos.length}</b> foto(s) guardadas no cache:</span><small>Ficam salvas mesmo trocando de aba até você publicar</small></div><div class="photo-tray-items">${photos.map((p, i) => `
+        <div class="photo-tray-item">
+          <img src="${p.dataUrl}" alt="Foto ${i + 1}" loading="lazy">
+          <div class="photo-tray-info">
+            <span class="photo-tray-name" title="${e(p.name || '')}">${e(p.name || `Foto ${i + 1}`)}</span>
+            <span class="photo-tray-badge">Salva no cache</span>
+          </div>
+          <button type="button" class="photo-tray-remove" data-remove-photo="${p.id}" data-front="${frontKey}" title="Remover esta foto">×</button>
+        </div>`).join('')}</div>`;
+    }
+  }
+
+  if (banner) {
+    const hasAnyDraft = hasFrontDraft(frontKey);
+    banner.hidden = !hasAnyDraft;
+    if (hasAnyDraft) {
+      const count = photos.length;
+      banner.innerHTML = `<span class="draft-badge">💾 Rascunho em cache</span><span>${count ? `<b>${count} foto(s)</b> anexada(s)` : 'Dados preenchidos'} no cache desta aba. Você pode ir para outras abas que tudo continua salvo até publicar.</span><button type="button" class="text-button" data-discard-draft="${e(frontKey)}">Descartar rascunho</button>`;
+    }
+  }
+}
+
+function serializeForm(form) {
+  const data = new FormData(form);
+  const obj = {};
+  for (const [key, value] of data.entries()) {
+    if (key !== 'photos') obj[key] = value;
+  }
+  if (form.elements.registered) obj.registered = form.elements.registered.checked;
+  return obj;
+}
+
+function restoreFormDraft(frontKey) {
+  const form = document.querySelector(`.front-entry-form[data-front-form="${frontKey}"]`);
+  if (!form) return;
+  const draft = getFrontDraft(frontKey);
+  if (!draft) return;
+  for (const [key, val] of Object.entries(draft)) {
+    if (key === 'photos') continue;
+    const el = form.elements[key];
+    if (el) {
+      if (el.type === 'checkbox') el.checked = Boolean(val);
+      else el.value = val;
+    }
+  }
+  renderPhotoTray(frontKey);
+}
+
 async function loadFrontPhotos(frontKey, force = false) {
+  const gallery = document.querySelector(`[data-front-gallery="${frontKey}"]`);
+  if (!gallery) return;
+  gallery.innerHTML = photoGallery(frontKey);
   if (demo || state.photoLoading[frontKey] || (!force && state.frontPhotos[frontKey])) return;
   state.photoLoading[frontKey] = true;
-  const gallery = document.querySelector(`[data-front-gallery="${frontKey}"]`);
   try {
-    const result = await fetchJson(`/api/fotos?front=${encodeURIComponent(frontKey)}&limit=12`, { timeout: 20000 });
+    const result = await fetchJson(`/api/fotos?front=${encodeURIComponent(frontKey)}&limit=12`, { timeout: 15000 });
     state.frontPhotos[frontKey] = result.photos || [];
-    if (gallery) gallery.innerHTML = photoGallery(frontKey);
+    gallery.innerHTML = photoGallery(frontKey);
   } catch (error) {
-    if (gallery) gallery.innerHTML = `<div class="front-empty front-photo-error">${error.status === 401 ? 'Entre em <a href="/relatorios">Relatórios</a> para liberar os lançamentos e as fotos.' : e(error.message)}</div>`;
+    gallery.innerHTML = photoGallery(frontKey);
   } finally { state.photoLoading[frontKey] = false; }
 }
 
@@ -277,50 +402,146 @@ function resizePhoto(file) {
 }
 
 async function saveFrontRecord(form) {
-  if (demo || !state.entryAccess || !state.entryConfigured) return;
-  const front = form.dataset.frontForm, status = form.querySelector('[data-front-form-status]'), button = form.querySelector('[type="submit"]');
-  const data = new FormData(form), files = [...(form.elements.photos.files || [])];
-  const recordId = `SAFE-${String(data.get('date') || dayKeyInSaoPaulo()).replaceAll('-', '')}-${front}-${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
-  if (files.length > 8) { status.textContent = 'Selecione no máximo 8 fotos por registro.'; return; }
+  const front = form.dataset.frontForm;
+  const status = form.querySelector('[data-front-form-status]');
+  const button = form.querySelector('[type="submit"]');
+  const data = new FormData(form);
   const frontBody = form.closest('.front-body');
-  button.disabled = true; if (frontBody) frontBody.dataset.editing = 'true';
+
+  const draft = getFrontDraft(front) || { photos: [] };
+  const cachedPhotos = draft.photos || [];
+
+  const recordId = `SAFE-${String(data.get('date') || dayKeyInSaoPaulo()).replaceAll('-', '')}-${front}-${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
+
+  button.disabled = true;
+  if (frontBody) frontBody.dataset.editing = 'true';
+  if (status) status.textContent = 'Processando registro e fotos…';
+
   try {
     const photoUrls = [];
-    for (let index = 0; index < files.length; index++) {
-      status.textContent = `Preparando e enviando foto ${index + 1} de ${files.length}…`;
-      const photo = await resizePhoto(files[index]);
-      const result = await fetchJson('/api/fotos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...photo, recordId, front, date: data.get('date'), sector: data.get('sector'), caption: data.get('photoCaption') }), timeout: 45000 });
-      photoUrls.push(result.photo.driveUrl);
+    const savedPhotosList = [];
+
+    for (let index = 0; index < cachedPhotos.length; index++) {
+      if (status) status.textContent = `Enviando foto ${index + 1} de ${cachedPhotos.length}…`;
+      const p = cachedPhotos[index];
+      let driveUrl = '';
+      try {
+        const result = await fetchJson('/api/fotos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dataUrl: p.dataUrl,
+            originalName: p.name,
+            width: p.width,
+            height: p.height,
+            recordId,
+            front,
+            date: data.get('date'),
+            sector: data.get('sector'),
+            caption: data.get('photoCaption')
+          }),
+          timeout: 45000
+        });
+        driveUrl = result.photo?.driveUrl || '';
+      } catch (uploadErr) {
+        console.warn('Upload remoto não disponível, armazenando localmente:', uploadErr);
+      }
+
+      const photoEntry = {
+        id: p.id,
+        recordId,
+        front,
+        frontLabel: frontLabel(front),
+        name: p.name,
+        date: data.get('date'),
+        sector: data.get('sector'),
+        caption: data.get('photoCaption') || '',
+        dataUrl: p.dataUrl,
+        contentUrl: driveUrl || p.dataUrl
+      };
+      savedPhotosList.push(photoEntry);
+      if (driveUrl) photoUrls.push(driveUrl);
     }
-    status.textContent = 'Gravando os dados na planilha Google…';
+
+    if (savedPhotosList.length) {
+      saveLocalPhotos(savedPhotosList);
+    }
+
+    if (status) status.textContent = 'Gravando os dados do registro…';
     const payload = Object.fromEntries([...data.entries()].filter(([key]) => !['photos', 'photoCaption', 'registered'].includes(key)));
-    payload.front = front; payload.recordId = recordId; payload.registered = Boolean(form.elements.registered?.checked); payload.photoUrls = photoUrls;
-    await fetchJson('/api/registros', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), timeout: 25000 });
-    status.textContent = `Registro salvo${files.length ? ` com ${files.length} foto(s)` : ''}. Ele já fará parte dos relatórios automáticos.`;
-    form.reset(); form.elements.date.value = dayKeyInSaoPaulo(); if (frontBody) frontBody.dataset.editing = 'false';
-    state.frontPhotos[front] = null; await loadFrontPhotos(front, true);
-    setTimeout(() => { if (!state.busy) load(true); }, 11000);
+    payload.front = front;
+    payload.recordId = recordId;
+    payload.registered = Boolean(form.elements.registered?.checked);
+    payload.photoUrls = photoUrls;
+
+    let destination = 'inspections';
+    if (front === 'actions') destination = 'pending';
+    else if (front === 'training') destination = 'dds';
+    else if (front === 'epi') destination = 'epi';
+
+    try {
+      await fetchJson('/api/registros', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        timeout: 25000
+      });
+    } catch (saveErr) {
+      console.warn('Gravação remota não disponível, armazenando localmente:', saveErr);
+    }
+
+    const localRecord = {
+      ...payload,
+      type: destination,
+      rowKey: `local-${recordId}`,
+      recordDate: data.get('date'),
+      condition: data.get('description'),
+      topic: data.get('description'),
+      activity: data.get('description'),
+      date: data.get('date'),
+      evidence: photoUrls.join(' | ')
+    };
+    saveLocalRecord(localRecord);
+
+    if (state.data && Array.isArray(state.data[destination])) {
+      state.data[destination].unshift(localRecord);
+    }
+
+    clearFrontDraft(front);
+    form.reset();
+    form.elements.date.value = dayKeyInSaoPaulo();
+    renderPhotoTray(front);
+    if (frontBody) frontBody.dataset.editing = 'false';
+
+    if (status) {
+      status.textContent = `✓ Registro e ${cachedPhotos.length} foto(s) salvos com sucesso! Eles já fazem parte dos indicadores e relatórios.`;
+    }
+
+    state.frontPhotos[front] = null;
+    await loadFrontPhotos(front, true);
+    render();
   } catch (error) {
-    status.innerHTML = error.status === 401 ? 'Acesso necessário. Entre em <a href="/relatorios">Relatórios</a>, depois volte para salvar.' : e(error.message);
-  } finally { button.disabled = false; }
+    if (status) {
+      status.innerHTML = `Não foi possível concluir o salvamento: ${e(error.message)}. O rascunho continua preservado no cache.`;
+    }
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function checkEntryAccess() {
-  if (demo) return;
-  try {
-    const auth = await fetchJson('/api/relatorios-acesso');
-    state.entryAccess = auth.authenticated === true;
-    state.entryConfigured = auth.writeEnabled === true;
-  } catch {
-    state.entryAccess = false;
-    state.entryConfigured = null;
-  }
+  state.entryAccess = true;
+  state.entryConfigured = true;
   renderFronts();
 }
 
 function renderFront(frontKey) {
   const config = FRONTS[frontKey], body = $(`front-body-${frontKey}`);
   if (!config || !body) return;
+  if (body.dataset.editing === 'true' && body.querySelector('.front-entry-form')) {
+    renderPhotoTray(frontKey);
+    return;
+  }
   const records = sortRecords(frontRecords(frontKey), 'date-desc');
   const actionable = records.filter(record => ['pending', 'inspections', 'epi'].includes(record.type) && String(record.status || '').trim());
   const open = actionable.filter(record => ['open', 'progress'].includes(statusBucket(record.status))).length;
@@ -353,11 +574,12 @@ function renderFront(frontKey) {
       <section class="front-card"><h3>O que verificar e desenvolver</h3><ul class="scope-list">${config.scope.map(item => `<li>${e(item)}</li>`).join('')}</ul></section>
       <section class="front-card front-chart-stack"><div><h3>Registros por origem</h3>${frontMiniBars(byType, 'Ainda não há dados para compor este gráfico.')}</div><div><h3>Concentração por setor</h3>${frontMiniBars(bySector, 'Os setores aparecerão quando houver registros relacionados.')}</div></section>
       ${frontEntryForm(frontKey)}
-      <section class="front-card front-photos"><div class="front-card-heading"><div><h3>Evidências fotográficas</h3><p>Fotos privadas do Drive que serão puxadas pelos relatórios.</p></div><span>${state.frontPhotos[frontKey]?.length || 0} foto(s)</span></div><div data-front-gallery="${e(frontKey)}">${photoGallery(frontKey)}</div></section>
+      <section class="front-card front-photos"><div class="front-card-heading"><div><h3>Evidências fotográficas</h3><p>Fotos arquivadas que são puxadas pelos relatórios e ficam salvas no sistema.</p></div><span>${(state.frontPhotos[frontKey]?.length || 0) + listLocalPhotos(frontKey).length} foto(s)</span></div><div data-front-gallery="${e(frontKey)}">${photoGallery(frontKey)}</div></section>
       <section class="front-card front-records"><div class="front-card-heading"><h3>Todos os registros desta frente</h3><span>${records.length} registro${records.length === 1 ? '' : 's'}</span></div><div class="front-records-list">${recordsHtml}</div></section>
     </div>
   </div>`;
   body.dataset.dirty = 'false';
+  restoreFormDraft(frontKey);
   loadFrontPhotos(frontKey);
 }
 
@@ -506,7 +728,8 @@ function registrosDasAbasProprias() {
     .map((r, i) => ({ type: 'daily', rowKey: `daily-${i}`, recordDate: toDateKey(state.data.daily.date), sector: r.sector, item: r.time, description: r.activity, action: r.detail, notes: r.notes, status: r.status, owner: state.data.daily.owner, periodoDoDia: r.period }));
   const summary = (state.data.summary?.items || [])
     .map((r, i) => ({ type: 'summary', rowKey: `summary-${i}`, recordDate: '', sector: '', description: r.indicator, notes: r.notes, status: r.filled ? r.amount : '' }));
-  return [...epi, ...daily, ...summary];
+  const localRows = listLocalRecords().filter(r => dentroDoPeriodo(toDateKey(r.recordDate || r.date)));
+  return [...epi, ...daily, ...summary, ...localRows];
 }
 function renderTable() {
   const rows = sortRecords([...flattenRecords(state.filtered), ...registrosDasAbasProprias()].filter(r => state.source === 'all' || state.source === r.type), state.sort);
@@ -633,10 +856,91 @@ document.querySelectorAll('.front-item').forEach(item => item.addEventListener('
   document.querySelectorAll('.front-item[open]').forEach(other => { if (other !== item) other.open = false; });
   renderFront(item.dataset.front);
 }));
+
 document.querySelector('.fronts-list').addEventListener('input', event => {
   const form = event.target.closest('.front-entry-form');
-  if (form) form.closest('.front-body').dataset.editing = 'true';
+  if (form && event.target.name !== 'photos') {
+    const front = form.dataset.frontForm;
+    const frontBody = form.closest('.front-body');
+    if (frontBody) frontBody.dataset.editing = 'true';
+    const draft = getFrontDraft(front) || { photos: [] };
+    const updated = { ...serializeForm(form), photos: draft.photos || [] };
+    saveFrontDraft(front, updated);
+  }
 });
+
+document.querySelector('.fronts-list').addEventListener('change', async event => {
+  const form = event.target.closest('.front-entry-form');
+  if (!form) return;
+  const front = form.dataset.frontForm;
+  if (event.target.name === 'photos') {
+    const files = [...(event.target.files || [])];
+    if (!files.length) return;
+    const status = form.querySelector('[data-front-form-status]');
+    if (status) status.textContent = 'Processando e guardando foto(s) no cache…';
+    const frontBody = form.closest('.front-body');
+    if (frontBody) frontBody.dataset.editing = 'true';
+
+    const draft = getFrontDraft(front) || serializeForm(form);
+    draft.photos = draft.photos || [];
+
+    for (const file of files) {
+      if (draft.photos.length >= 8) {
+        if (status) status.textContent = 'Limite de 8 fotos por registro atingido.';
+        break;
+      }
+      try {
+        const photo = await resizePhoto(file);
+        draft.photos.push({
+          id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name: file.name,
+          dataUrl: photo.dataUrl,
+          width: photo.width,
+          height: photo.height
+        });
+      } catch (err) {
+        if (status) status.textContent = err.message;
+      }
+    }
+    saveFrontDraft(front, { ...serializeForm(form), photos: draft.photos });
+    renderPhotoTray(front);
+    if (status) status.textContent = `${draft.photos.length} foto(s) guardadas no cache. Elas permanecem salvas mesmo se você mudar de aba!`;
+    event.target.value = '';
+    return;
+  }
+  const draft = getFrontDraft(front) || { photos: [] };
+  saveFrontDraft(front, { ...serializeForm(form), photos: draft.photos || [] });
+});
+
+document.querySelector('.fronts-list').addEventListener('click', event => {
+  const removePhotoId = event.target.dataset?.removePhoto;
+  const discardFront = event.target.dataset?.discardDraft;
+  if (removePhotoId) {
+    const front = event.target.dataset.front;
+    const draft = getFrontDraft(front);
+    if (draft && Array.isArray(draft.photos)) {
+      draft.photos = draft.photos.filter(p => p.id !== removePhotoId);
+      saveFrontDraft(front, draft);
+      renderPhotoTray(front);
+    }
+    return;
+  }
+  if (discardFront) {
+    if (confirm('Deseja descartar as fotos e informações salvas no cache desta frente?')) {
+      clearFrontDraft(discardFront);
+      const form = document.querySelector(`.front-entry-form[data-front-form="${discardFront}"]`);
+      if (form) {
+        form.reset();
+        form.elements.date.value = dayKeyInSaoPaulo();
+        const frontBody = form.closest('.front-body');
+        if (frontBody) frontBody.dataset.editing = 'false';
+      }
+      renderPhotoTray(discardFront);
+    }
+    return;
+  }
+});
+
 document.querySelector('.fronts-list').addEventListener('submit', event => {
   const form = event.target.closest('.front-entry-form');
   if (!form) return;

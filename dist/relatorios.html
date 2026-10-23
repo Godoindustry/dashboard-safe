@@ -35,17 +35,23 @@
 
     <section id="reports-workspace" hidden>
       <div class="page-heading no-print">
-        <div><p class="eyebrow">Área exclusiva</p><h1>Relatórios semanais e mensais</h1></div>
-        <div class="toolbar"><button class="button secondary" id="ai-report-button" type="button">Gerar análise com IA</button><button class="button primary" id="print-button" type="button">Salvar em PDF</button></div>
+        <div><p class="eyebrow">Área exclusiva</p><h1>Relatórios diários, semanais e mensais</h1></div>
+        <div class="toolbar">
+          <button class="button secondary" id="ai-report-button" type="button">Gerar análise com IA</button>
+          <button class="button secondary" id="save-history-button" type="button"><span aria-hidden="true">💾</span> Salvar no histórico</button>
+          <button class="button primary" id="print-button" type="button">Salvar em PDF</button>
+        </div>
       </div>
-      <div class="report-status no-print automation-notice"><strong>Automação ativa:</strong> semanal toda sexta às 16h e mensal no último dia às 15h, sempre no horário de São Paulo. Os PDFs e as fotos ficam no Google Drive.</div>
+      <div class="report-status no-print automation-notice"><strong>Automação ativa:</strong> emissão diária, semanal e mensal integrada. Relatórios e fotos salvos ficam disponíveis para consulta e download posterior.</div>
 
       <section class="report-controls no-print" aria-label="Configuração do relatório">
         <div class="segmented" role="group" aria-label="Tipo de relatório">
-          <button class="active" type="button" data-report-type="weekly">Semanal</button>
+          <button class="active" type="button" data-report-type="daily">Diário</button>
+          <button type="button" data-report-type="weekly">Semanal</button>
           <button type="button" data-report-type="monthly">Mensal</button>
         </div>
-        <label id="week-control">Semana de <input id="report-week" type="date"></label>
+        <label id="day-control">Dia <input id="report-day" type="date"></label>
+        <label id="week-control" hidden>Semana de <input id="report-week" type="date"></label>
         <label id="month-control" hidden>Mês <input id="report-month" type="month"></label>
         <label>Responsável pela inspeção <input id="report-owner" type="text" value="Técnica de Segurança do Trabalho"></label>
         <label>Setor<select id="report-sector"><option value="">Todos os setores</option></select></label>
@@ -62,9 +68,20 @@
         <label for="report-photos">Fotos do relatório — anexe as imagens que devem sair no PDF
           <input id="report-photos" type="file" accept="image/png,image/jpeg,image/webp" multiple>
         </label>
-        <p class="filter-note" id="report-photo-count">Buscando no Google Drive as fotos deste período.</p>
-        <p class="filter-note">As fotos lançadas nas frentes são buscadas automaticamente no Google Drive. Você ainda pode acrescentar imagens somente para esta prévia. Confira se nenhuma imagem mostra dados pessoais ou informações médicas.</p>
+        <p class="filter-note" id="report-photo-count">Buscando as fotos deste período.</p>
+        <p class="filter-note">As fotos lançadas nas frentes são recuperadas automaticamente. Você ainda pode acrescentar imagens para esta emissão. Todas as fotos ficam salvas com o relatório para acesso posterior.</p>
         <div class="photo-grid" id="report-photo-list"></div>
+      </section>
+
+      <section class="editor-panel no-print saved-reports-section" id="saved-reports-section" aria-label="Histórico de relatórios salvos">
+        <div class="saved-reports-header">
+          <div>
+            <h3>Relatórios salvos para acesso posterior</h3>
+            <p class="filter-note">Relatórios diários, semanais e mensais salvos com suas fotos e métricas para consulta a qualquer momento.</p>
+          </div>
+          <span class="count-badge" id="saved-reports-count">0 salvos</span>
+        </div>
+        <div class="saved-reports-grid" id="saved-reports-list"></div>
       </section>
 
       <article class="report-paper" id="report-paper">

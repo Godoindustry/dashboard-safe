@@ -73,4 +73,4 @@ export function createReportPdf(report) {
   for(let i=1;i<=count;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(100);doc.text(`SAFE | ${report.demo?'DEMONSTRAÇÃO':report.automatic?'AUTOMÁTICO PARA REVISÃO':'PRÉVIA PARA REVISÃO'} | ${report.period}`,margin,268);doc.text(`${i} / ${count}`,198,268,{align:'right'});}
   return doc;
 }
-export function downloadReport(report) { createReportPdf(report).save(`SAFE_${report.type==='monthly'?'Mensal':'Semanal'}_${report.filters.start}${report.demo?'_DEMONSTRACAO':''}.pdf`); }
+export function downloadReport(report) { const typeLabel = report.type === 'daily' ? 'Diario' : report.type === 'monthly' ? 'Mensal' : 'Semanal'; createReportPdf(report).save(`SAFE_${typeLabel}_${report.filters.start}${report.demo?'_DEMONSTRACAO':''}.pdf`); }

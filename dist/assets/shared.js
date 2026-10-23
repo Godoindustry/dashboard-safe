@@ -176,6 +176,10 @@ export async function fetchJson(url, options = {}) {
 
 export function getPeriodRange(type, value) {
   const base = parseDate(/^\d{4}-\d{2}$/.test(value) ? `${value}-01` : value) || new Date();
+  if (type === "daily") {
+    const day = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+    return { start: day, end: day };
+  }
   if (type === "monthly") {
     return {
       start: new Date(base.getFullYear(), base.getMonth(), 1),

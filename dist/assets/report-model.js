@@ -9,5 +9,7 @@ export function buildReport(data, options) {
   // A aba Inspeção de EPI tem formato próprio e entra no relatório pelo mesmo recorte de datas.
   const inicio=toDateKey(range.start), fim=toDateKey(range.end);
   records.epi=(data.epi||[]).filter(r=>{const dia=toDateKey(r.date);return dia&&dia>=inicio&&dia<=fim;});
-  return { type:options.type, title:`RELATÓRIO ${options.type==='monthly'?'MENSAL':'SEMANAL'} DE SEGURANÇA DO TRABALHO`, period:`${formatDate(range.start)} a ${formatDate(range.end)}`, filters, filterLabel:filterDescription(filters), owner:options.owner || 'Não informado', data:records, metrics:calculateMetrics(records), notes:options.notes || '', photos:Array.isArray(options.photos) ? options.photos : [], generatedAt:data.generatedAt, revision:data.revision, demo:options.demo===true, emittedAt:new Date().toISOString() };
+  const titleType = options.type === 'daily' ? 'DIÁRIO' : options.type === 'monthly' ? 'MENSAL' : 'SEMANAL';
+  const periodText = options.type === 'daily' ? formatDate(range.start) : `${formatDate(range.start)} a ${formatDate(range.end)}`;
+  return { type:options.type, title:`RELATÓRIO ${titleType} DE SEGURANÇA DO TRABALHO`, period:periodText, filters, filterLabel:filterDescription(filters), owner:options.owner || 'Não informado', data:records, metrics:calculateMetrics(records), notes:options.notes || '', photos:Array.isArray(options.photos) ? options.photos : [], generatedAt:data.generatedAt, revision:data.revision, demo:options.demo===true, emittedAt:new Date().toISOString() };
 }

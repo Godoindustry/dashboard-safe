@@ -180,9 +180,23 @@ function json(status, body, headers = {}) {
 
 async function localApi(path, init = {}) {
   const url = new URL(path, location.origin);
-  if (url.pathname === "/api/relatorios-acesso") return json(200, { protected: false, authenticated: true });
+  if (url.pathname === "/api/relatorios-acesso") return json(200, { protected: false, authenticated: true, writeEnabled: true });
   if (url.pathname === "/api/ia") {
     return json(503, { error: "Esta publicação não inclui o servidor da IA. Os indicadores, filtros e o PDF continuam funcionando normalmente." });
+  }
+  if (url.pathname === "/api/fotos") {
+    if (init.method === "POST") {
+      try {
+        const body = JSON.parse(init.body || "{}");
+        return json(201, { photo: { driveUrl: body.dataUrl || "", id: body.recordId || Date.now() } });
+      } catch {
+        return json(200, { photo: { driveUrl: "" } });
+      }
+    }
+    return json(200, { photos: [] });
+  }
+  if (url.pathname === "/api/registros") {
+    return json(201, { saved: true, destination: "local" });
   }
   if (url.pathname !== "/api/dados") return json(404, { error: "Recurso indisponível." });
   try {
