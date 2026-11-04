@@ -27,7 +27,7 @@ export function driveConfiguration() {
   const serviceAccount = Boolean(config.email && config.privateKey);
   const partialOauth = Boolean(config.clientId || config.clientSecret || config.refreshToken) && !oauth;
   const partialService = Boolean(config.email || config.privateKey) && !serviceAccount;
-  if (!config.folderId) return { ready: false, error: "Configure GOOGLE_DRIVE_FOLDER_ID no Netlify." };
+  if (!config.folderId) return { ready: false, error: "Configure GOOGLE_DRIVE_FOLDER_ID na Vercel." };
   if (partialOauth || partialService) return { ready: false, error: "As credenciais do Google Drive estão incompletas." };
   if (!oauth && !serviceAccount) return { ready: false, error: "Configure uma conta de serviço ou OAuth do Google Drive." };
   if (serviceAccount && !config.sharedDriveId && !config.subject) {

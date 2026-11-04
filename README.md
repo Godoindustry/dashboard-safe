@@ -16,7 +16,8 @@ Na Vercel: Root Directory na raiz do repositório; Build Command conforme `verce
 - Filtros combináveis por múltiplos meses, datas, setor, status, prioridade, busca, turno, registro de DDS e prazo vencido. Clique nas barras/legendas para filtrar. Explorador por tipo, ordenação e paginação, sem limitar o total a oito registros.
 - Temas claro e escuro, preferência salva no navegador.
 - IA sem senha de visitante: analisa indicadores e organiza a visualização por comandos. Alterações visuais podem ser desfeitas. Não cria fatos nem toma decisões de segurança no lugar de um responsável.
-- Cada uma das 12 frentes possui formulário de lançamento. O site grava inspeções, pendências ou DDS na aba correspondente da planilha Google e envia as fotos reduzidas para uma pasta privada do Google Drive.
+- Cada uma das 12 frentes possui formulário de lançamento, com até 20 fotos por registro. O site grava inspeções, pendências ou DDS na aba correspondente da planilha Google e envia as fotos reduzidas para uma pasta privada do Google Drive.
+- O registro só aparece como salvo depois de chegar à planilha e ao Drive. Se algo falhar, o site mostra o motivo e mantém o rascunho e as fotos no aparelho (IndexedDB) para tentar de novo, sem duplicar as fotos já enviadas. Faltando configuração, o formulário avisa qual variável preencher.
 - Área separada `/relatorios`: semanal (segunda–domingo) e mensal, filtros, fotos do Drive, observações editáveis e download PDF paginado. PDF não usa IA obrigatoriamente.
 - Relatório semanal automático toda sexta-feira às 16h e mensal automático no último dia do mês às 15h, sempre no fuso `America/Sao_Paulo`. Os PDFs são arquivados no Drive sem duplicar uma mesma competência.
 - Relatórios seguem a estrutura do Word fornecido, com indicadores e DDS acrescentados. Referências normativas são as do modelo, não certificação de conformidade. Toda saída é uma prévia para revisão/aprovação técnica.
@@ -27,7 +28,7 @@ Na Vercel: Root Directory na raiz do repositório; Build Command conforme `verce
 
 Na cópia local, chaves ficam em `.env.local`, ignorado pelo Git. Em produção, cadastre-as em Vercel → Project → Settings → Environment Variables. Nunca coloque segredos dentro de `dist` ou no repositório.
 
-O fluxo de planilha, fotos e relatórios não precisa de banco de dados externo. A IA é opcional; lançamentos e PDFs não dependem dela.
+O fluxo de planilha, fotos e relatórios não precisa de banco de dados externo: a planilha Google guarda os registros e o Google Drive guarda as fotos e os PDFs. O navegador guarda só rascunhos. A IA é opcional; lançamentos e PDFs não dependem dela.
 
 ### Google Drive e gravação pelo site
 
@@ -61,7 +62,7 @@ Nomes, CID, motivos e descrição médica da aba Absenteísmo não são enviados
 
 **Antes de registrar dados pessoais na planilha, retire o compartilhamento público** e configure a conta de serviço Google: compartilhe a planilha como Editor e preencha `GOOGLE_SERVICE_ACCOUNT_EMAIL` e `GOOGLE_PRIVATE_KEY` na Vercel. Apenas uma das duas preenchida causa bloqueio.
 
-A leitura pública do painel continua separada dos lançamentos. Para gravar registros ou abrir fotos, a pessoa precisa entrar em `/relatorios`; o cookie protegido vale para todo o site por 12 horas. Os PDFs manuais ficam no computador, e os PDFs automáticos são arquivados na pasta configurada do Drive. As imagens não são publicadas por URL aberta: passam por uma função autenticada.
+A leitura pública do painel continua separada dos lançamentos. Para gravar registros ou abrir fotos, a pessoa precisa do código de acesso: em `/relatorios` ou no próprio formulário, que pede o código na hora de salvar. O cookie protegido vale para todo o site por 12 horas. Os PDFs manuais ficam no computador, e os PDFs automáticos são arquivados na pasta configurada do Drive. As imagens não são publicadas por URL aberta: passam por uma função autenticada.
 
 ## Desenvolvimento e verificação
 

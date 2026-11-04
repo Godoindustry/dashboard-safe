@@ -91,11 +91,38 @@ export function saveReportToHistory(report) {
     const filtered = current.filter(r => r.id !== id);
     // Limita o histórico a 50 relatórios salvos para economizar espaço
     filtered.unshift(entry);
-    localStorage.setItem(SAVED_REPORTS_KEY, JSON.stringify(filtered.slice(0, 50)));
+    writeReportHistory(filtered.slice(0, 50));
     return entry;
   } catch (err) {
     console.error('Falha ao salvar relatório no histórico:', err);
     throw new Error('Armazenamento cheio ou indisponível para salvar o relatório no histórico.');
+  }
+}
+
+// Foto que tem cópia no Drive não precisa ocupar espaço dentro do histórico.
+function withoutInlineDrivePhotos(photos) {
+  return (photos || []).map(photo => (photo.contentUrl && !String(photo.contentUrl).startsWith('data:') ? { ...photo, dataUrl: '' } : photo));
+}
+
+function writeReportHistory(list) {
+  try {
+    localStorage.setItem(SAVED_REPORTS_KEY, JSON.stringify(list));
+    return;
+  } catch {}
+  let slim = list.map(item => ({
+    ...item,
+    photos: withoutInlineDrivePhotos(item.photos),
+    reportSnapshot: item.reportSnapshot ? { ...item.reportSnapshot, photos: withoutInlineDrivePhotos(item.reportSnapshot.photos) } : item.reportSnapshot
+  }));
+  // Se ainda não couber, sai o relatório mais antigo; o mais novo é sempre o último a sair.
+  for (;;) {
+    try {
+      localStorage.setItem(SAVED_REPORTS_KEY, JSON.stringify(slim));
+      return;
+    } catch (err) {
+      if (slim.length <= 1) throw err;
+      slim = slim.slice(0, -1);
+    }
   }
 }
 
@@ -159,5 +186,89 @@ export function saveLocalPhotos(photos) {
     localStorage.setItem(LOCAL_PHOTOS_KEY, JSON.stringify(updated.slice(0, 200)));
   } catch (err) {
     console.warn('Erro ao salvar fotos localmente:', err);
+  }
+}
+
+export function removeLocalRecord(recordId) {
+  try {
+    localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(listLocalRecords().filter(r => r.recordId !== recordId)));
+    localStorage.setItem(LOCAL_PHOTOS_KEY, JSON.stringify(listLocalPhotos().filter(p => p.recordId !== recordId)));
+  } catch (err) {
+    console.warn('Erro ao limpar registro local:', err);
+  }
+}
+
+// --- FOTOS DOS RASCUNHOS (INDEXEDDB) ---
+// As fotos não cabem no localStorage (cerca de 5 MB por site): com poucas imagens a
+// gravação falhava e o rascunho perdia as fotos. O IndexedDB aguenta as 20 de cada frente.
+const PHOTO_DB = 'safe_evidencias';
+const PHOTO_STORE = 'fotos_rascunho';
+const memoryPhotos = new Map(); // Reserva para navegadores que bloqueiam o IndexedDB.
+let photoDb = null;
+
+function openPhotoDb() {
+  if (!photoDb) {
+    photoDb = new Promise((resolve, reject) => {
+      if (!globalThis.indexedDB) return reject(new Error('IndexedDB indisponível.'));
+      const request = indexedDB.open(PHOTO_DB, 1);
+      request.onupgradeneeded = () => request.result.createObjectStore(PHOTO_STORE, { keyPath: 'id' }).createIndex('front', 'front');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    }).catch(err => { photoDb = null; throw err; });
+  }
+  return photoDb;
+}
+
+async function photoTransaction(mode, work) {
+  const db = await openPhotoDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PHOTO_STORE, mode);
+    const request = work(tx.objectStore(PHOTO_STORE));
+    tx.oncomplete = () => resolve(request?.result);
+    tx.onerror = tx.onabort = () => reject(tx.error);
+  });
+}
+
+const memoryList = frontKey => [...memoryPhotos.values()].filter(p => p.front === frontKey);
+
+export async function listDraftPhotos(frontKey) {
+  let stored = [];
+  try {
+    stored = await photoTransaction('readonly', store => store.index('front').getAll(frontKey)) || [];
+  } catch (err) {
+    console.warn('IndexedDB indisponível, usando fotos em memória:', err);
+  }
+  return [...stored, ...memoryList(frontKey)].sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0));
+}
+
+export async function putDraftPhoto(photo) {
+  try {
+    await photoTransaction('readwrite', store => store.put(photo));
+    memoryPhotos.delete(photo.id);
+  } catch (err) {
+    console.warn('IndexedDB indisponível, usando fotos em memória:', err);
+    memoryPhotos.set(photo.id, photo);
+  }
+}
+
+export async function removeDraftPhoto(id) {
+  memoryPhotos.delete(id);
+  try { await photoTransaction('readwrite', store => store.delete(id)); } catch {}
+}
+
+export async function clearDraftPhotos(frontKey) {
+  await Promise.all((await listDraftPhotos(frontKey)).map(photo => removeDraftPhoto(photo.id)));
+}
+
+// Rascunhos antigos guardavam as fotos no localStorage: move para o IndexedDB e libera o espaço.
+export async function migrateDraftPhotos() {
+  const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).filter(key => key?.startsWith(DRAFT_PREFIX));
+  for (const key of keys) {
+    const frontKey = key.slice(DRAFT_PREFIX.length);
+    const draft = getFrontDraft(frontKey);
+    if (!draft?.photos?.length) continue;
+    for (const [index, photo] of draft.photos.entries()) await putDraftPhoto({ ...photo, front: frontKey, addedAt: Date.now() + index });
+    const { photos, ...fields } = draft;
+    saveFrontDraft(frontKey, fields);
   }
 }

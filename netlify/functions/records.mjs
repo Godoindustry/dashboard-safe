@@ -35,7 +35,7 @@ export function normalizeRecord(body) {
   const sector = safe(body.sector, 120);
   const description = safe(body.description, 1000);
   if (!front || !recordDate || !sector || !description) throw new Error("Preencha frente, data, setor e descrição do registro.");
-  const photoUrls = Array.isArray(body.photoUrls) ? body.photoUrls.map((url) => safe(url, 500)).filter((url) => /^https:\/\/drive\.google\.com\//.test(url)).slice(0, 8) : [];
+  const photoUrls = Array.isArray(body.photoUrls) ? body.photoUrls.map((url) => safe(url, 500)).filter((url) => /^https:\/\/drive\.google\.com\//.test(url)).slice(0, 20) : [];
   const status = STATUS.has(body.status) ? body.status : "Em aberto";
   const priority = PRIORITY.has(body.priority) ? body.priority : "Não informada";
   const registered = body.registered === true ? "Sim" : "Não";
@@ -70,7 +70,7 @@ export function normalizeRecord(body) {
 
 export async function handler(event) {
   if (event.httpMethod !== "POST") return reply(405, { error: "Método não permitido." });
-  if (!protectedReady()) return reply(503, { error: "Para proteger os lançamentos, configure REPORTS_ACCESS_CODE e REPORTS_SESSION_SECRET no Netlify." });
+  if (!protectedReady()) return reply(503, { error: "Para proteger os lançamentos, configure REPORTS_ACCESS_CODE e REPORTS_SESSION_SECRET na Vercel." });
   if (!isReportAuthenticated(event)) return reply(401, { error: "Entre na área de Relatórios antes de registrar dados." });
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) return reply(503, { error: "Configure a conta de serviço Google para gravar na planilha." });
   try {

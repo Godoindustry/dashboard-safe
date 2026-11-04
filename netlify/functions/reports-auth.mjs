@@ -1,3 +1,4 @@
+import { driveConfiguration } from "./_shared/google-drive.mjs";
 import { clearSessionCookie, createSessionCookie, isReportAuthenticated, reportsProtectionEnabled, verifyAccessCode } from "./_shared/auth.mjs";
 
 const attempts = new Map();
@@ -20,8 +21,18 @@ function tooManyAttempts(event) {
   return current.count > 8;
 }
 
+// Só diz o que falta configurar, nunca os valores: o site avisa antes de a pessoa preencher tudo.
+function setupStatus() {
+  const drive = driveConfiguration();
+  return {
+    sheet: Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_SHEET_ID),
+    drive: drive.ready,
+    driveError: drive.ready ? "" : drive.error,
+  };
+}
+
 export async function handler(event) {
-  if (event.httpMethod === "GET") return reply(200, { protected: reportsProtectionEnabled(), authenticated: isReportAuthenticated(event), writeEnabled: Boolean(process.env.REPORTS_ACCESS_CODE && process.env.REPORTS_SESSION_SECRET) });
+  if (event.httpMethod === "GET") return reply(200, { protected: reportsProtectionEnabled(), authenticated: isReportAuthenticated(event), writeEnabled: Boolean(process.env.REPORTS_ACCESS_CODE && process.env.REPORTS_SESSION_SECRET), setup: setupStatus() });
   if (event.httpMethod === "DELETE") return reply(200, { authenticated: false }, { "Set-Cookie": clearSessionCookie() });
   if (event.httpMethod !== "POST") return reply(405, { error: "Método não permitido." });
   if (!reportsProtectionEnabled()) return reply(200, { protected: false, authenticated: true, writeEnabled: false });

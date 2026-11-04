@@ -5,7 +5,7 @@ import { saveReportToHistory, listSavedReports, deleteSavedReport, getSavedRepor
 
 const $ = id => document.getElementById(id), demo = new URLSearchParams(location.search).get('demo') === '1';
 const state = { data: null, report: null, type: 'daily', etag: '', timer: null, loading: false, aiBusy: false, photos: [], photoRequest: 0 };
-const MAX_PHOTOS = 12, MAX_SIDE = 1400;
+const MAX_PHOTOS = 20, MAX_SIDE = 1400;
 
 // Fotos extras da prévia são reduzidas no navegador; as evidências oficiais vêm do Drive ou do armazenamento local.
 function readPhoto(file) {
@@ -357,13 +357,18 @@ $('print-button').addEventListener('click', async () => {
     status('Preparando fotos e montando o PDF…');
     state.report.photos = await hydrateDrivePhotos(state.photos);
     state.report.notes = $('report-notes').value;
-    // Salva automaticamente no histórico para acesso posterior
-    saveReportToHistory(state.report);
-    renderSavedReports();
+    // Salva automaticamente no histórico para acesso posterior; histórico cheio não pode impedir o PDF.
+    let historySaved = true;
+    try {
+      saveReportToHistory(state.report);
+      renderSavedReports();
+    } catch {
+      historySaved = false;
+    }
 
     const { downloadReport } = await import('./pdf.bundle.js');
     downloadReport(state.report);
-    status(`PDF gerado e salvo no histórico com todos os registros e ${state.photos.length} foto(s).`);
+    status(historySaved ? `PDF gerado e salvo no histórico com todos os registros e ${state.photos.length} foto(s).` : `PDF gerado com ${state.photos.length} foto(s), mas o histórico deste navegador está cheio: apague relatórios antigos para voltar a salvar.`);
   } catch (err) {
     status('Não foi possível baixar o PDF. Recarregue a página e tente novamente.');
   } finally {

@@ -94,6 +94,12 @@
         <p>Selecione uma frente para visualizar o escopo completo, os indicadores e todos os registros relacionados.</p>
       </div>
       <div class="front-table-head" aria-hidden="true"><span>Frente</span><span>O que desenvolver</span><span>Periodicidade</span></div>
+      <div class="local-sync-banner" id="local-sync-banner" hidden>
+        <p><strong>⚠️ <span data-sync-count>0</span> registro(s) estão só neste aparelho.</strong> Eles apareceram como salvos, mas não chegaram à planilha. Envie agora para não perder.</p>
+        <label class="front-access" data-front-access hidden>Código de acesso<input data-access-code type="password" autocomplete="current-password" maxlength="100" placeholder="O mesmo da área de Relatórios"></label>
+        <button class="button primary" type="button" data-sync-button>Enviar para a planilha</button>
+        <span class="front-form-status" data-sync-status aria-live="polite"></span>
+      </div>
       <div class="fronts-list">
         <details class="front-item" data-front="safety">
           <summary><span class="front-icon" aria-hidden="true">⌕</span><strong>Inspeção de Segurança</strong><span class="front-description">Inspeção geral da fábrica, máquinas, docas, circulação, elétrica, organização e EPCs.</span><span class="front-period">▣ <b>Quinzenal</b></span><span class="front-chevron" aria-hidden="true">⌄</span></summary>

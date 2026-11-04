@@ -45,7 +45,7 @@ function automaticNotes(report) {
 }
 
 async function reportPhotos(start, end) {
-  const files = (await listDriveFiles({ kind: "photo", start, end, limit: 200 })).slice(0, 12).sort((a, b) => {
+  const files = (await listDriveFiles({ kind: "photo", start, end, limit: 200 })).slice(0, 20).sort((a, b) => {
     const front = String(a.appProperties?.front || "").localeCompare(String(b.appProperties?.front || ""), "pt-BR");
     return front || String(a.appProperties?.reportDate || "").localeCompare(String(b.appProperties?.reportDate || ""));
   });

@@ -35,7 +35,7 @@ function decodePhoto(dataUrl) {
 }
 
 export async function handler(event) {
-  if (!protectedReady()) return reply(503, { error: "Para proteger as fotos, configure REPORTS_ACCESS_CODE e REPORTS_SESSION_SECRET no Netlify." });
+  if (!protectedReady()) return reply(503, { error: "Para proteger as fotos, configure REPORTS_ACCESS_CODE e REPORTS_SESSION_SECRET na Vercel." });
   if (!isReportAuthenticated(event)) return reply(401, { error: "Entre na área de Relatórios para anexar ou visualizar fotos." });
   const drive = driveConfiguration();
   if (!drive.ready) return reply(503, { error: drive.error });

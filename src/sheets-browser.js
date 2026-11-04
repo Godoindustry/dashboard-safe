@@ -180,24 +180,17 @@ function json(status, body, headers = {}) {
 
 async function localApi(path, init = {}) {
   const url = new URL(path, location.origin);
-  if (url.pathname === "/api/relatorios-acesso") return json(200, { protected: false, authenticated: true, writeEnabled: true });
+  if (url.pathname === "/api/relatorios-acesso") return json(200, { protected: false, authenticated: true, writeEnabled: false, serverless: true });
   if (url.pathname === "/api/ia") {
     return json(503, { error: "Esta publicação não inclui o servidor da IA. Os indicadores, filtros e o PDF continuam funcionando normalmente." });
   }
+  // Sem servidor não há onde gravar: responder erro para o rascunho continuar preservado.
+  const semServidor = "Sem conexão com o servidor. Nada foi gravado; seu rascunho continua guardado.";
   if (url.pathname === "/api/fotos") {
-    if (init.method === "POST") {
-      try {
-        const body = JSON.parse(init.body || "{}");
-        return json(201, { photo: { driveUrl: body.dataUrl || "", id: body.recordId || Date.now() } });
-      } catch {
-        return json(200, { photo: { driveUrl: "" } });
-      }
-    }
+    if (init.method === "POST") return json(503, { error: semServidor });
     return json(200, { photos: [] });
   }
-  if (url.pathname === "/api/registros") {
-    return json(201, { saved: true, destination: "local" });
-  }
+  if (url.pathname === "/api/registros") return json(503, { error: semServidor });
   if (url.pathname !== "/api/dados") return json(404, { error: "Recurso indisponível." });
   try {
     const detail = url.searchParams.get("detail") === "report" ? "report" : "public";

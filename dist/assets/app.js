@@ -1,10 +1,12 @@
 import { escapeHtml as e, monthLabel, recordMonth, calculateMetrics, fetchJson, formatDate, statusBucket, priorityBucket, isOverdue, normalizeText, toDateKey, dayKeyInSaoPaulo, monthStartInSaoPaulo, COLORS } from './shared.js';
 import { emptyFilters, validateFilters, filterData, flattenRecords, sortRecords, filterDescription, validateActions, STATUS_LABELS, PRIORITY_LABELS, TYPE_LABELS } from './filters.js';
 import { setTheme } from './theme.js';
-import { getFrontDraft, saveFrontDraft, clearFrontDraft, hasFrontDraft, saveLocalRecord, listLocalRecords, saveLocalPhotos, listLocalPhotos } from './storage.js';
+import { getFrontDraft, saveFrontDraft, clearFrontDraft, hasFrontDraft, listLocalRecords, listLocalPhotos, removeLocalRecord, listDraftPhotos, putDraftPhoto, removeDraftPhoto, clearDraftPhotos, migrateDraftPhotos } from './storage.js';
+
+const MAX_RECORD_PHOTOS = 20;
 const $ = id => document.getElementById(id);
 const demo = new URLSearchParams(location.search).get('demo') === '1';
-const state = { data: null, filtered: {}, filters: emptyFilters(), source: 'all', sort: 'date-desc', page: 1, busy: false, paused: false, failures: 0, etag: '', timer: null, undo: null, periodo: 'hoje', frontPhotos: {}, photoLoading: {}, entryAccess: true, entryConfigured: true };
+const state = { data: null, filtered: {}, filters: emptyFilters(), source: 'all', sort: 'date-desc', page: 1, busy: false, paused: false, failures: 0, etag: '', timer: null, undo: null, periodo: 'hoje', frontPhotos: {}, photoLoading: {}, entryAccess: true, entryConfigured: true, entryProblem: '', syncing: false };
 const FRONTS = {
   safety: {
     direct: ['inspections'],
@@ -271,6 +273,7 @@ function frontEntryForm(frontKey) {
       <span class="front-storage-badge">Cache ativo</span>
     </div>
     <form class="front-entry-form" data-front-form="${e(frontKey)}">
+      ${state.entryProblem ? `<p class="front-setup-alert">⚠️ ${e(state.entryProblem)}</p>` : ''}
       <div class="draft-cache-banner" data-draft-banner="${e(frontKey)}" hidden></div>
       <div class="front-form-grid">
         <label>Data<input name="date" type="date" value="${dayKeyInSaoPaulo()}" required></label>
@@ -285,25 +288,25 @@ function frontEntryForm(frontKey) {
         <label class="field-wide">Observações<textarea name="notes" rows="2" maxlength="1500"></textarea></label>
         <label class="field-wide">Legenda das fotos<input name="photoCaption" maxlength="300" placeholder="Onde foi e o que as imagens mostram"></label>
         <div class="field-wide photo-upload-wrapper">
-          <label class="front-photo-picker"><span aria-hidden="true">＋</span><strong>Adicionar fotos</strong><small>Até 8 imagens · salvas em cache ao selecionar</small><input name="photos" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple></label>
+          <label class="front-photo-picker"><span aria-hidden="true">＋</span><strong>Adicionar fotos</strong><small>Até ${MAX_RECORD_PHOTOS} imagens · câmera ou galeria</small><input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
           <div class="form-photo-tray" data-photo-tray="${e(frontKey)}" hidden></div>
         </div>
       </div>
+      <label class="front-access" data-front-access hidden>Código de acesso<input data-access-code type="password" autocomplete="current-password" maxlength="100" placeholder="O mesmo da área de Relatórios"></label>
       <div class="front-submit-row">
         <button class="button primary" type="submit">Salvar registro e fotos</button>
-        <span class="front-form-status" data-front-form-status aria-live="polite">Pronto para salvar. Suas fotos e informações estão protegidas.</span>
+        <span class="front-form-status" data-front-form-status aria-live="polite">Pronto para salvar. O rascunho fica guardado neste aparelho até o envio.</span>
       </div>
     </form>
   </section>`;
 }
 
-function renderPhotoTray(frontKey) {
+async function renderPhotoTray(frontKey) {
   const form = document.querySelector(`.front-entry-form[data-front-form="${frontKey}"]`);
   if (!form) return;
   const tray = form.querySelector(`[data-photo-tray="${frontKey}"]`);
   const banner = form.querySelector(`[data-draft-banner="${frontKey}"]`);
-  const draft = getFrontDraft(frontKey);
-  const photos = draft?.photos || [];
+  const photos = await listDraftPhotos(frontKey);
 
   if (tray) {
     if (!photos.length) {
@@ -311,12 +314,12 @@ function renderPhotoTray(frontKey) {
       tray.hidden = true;
     } else {
       tray.hidden = false;
-      tray.innerHTML = `<div class="photo-tray-heading"><span><b>${photos.length}</b> foto(s) guardadas no cache:</span><small>Ficam salvas mesmo trocando de aba até você publicar</small></div><div class="photo-tray-items">${photos.map((p, i) => `
+      tray.innerHTML = `<div class="photo-tray-heading"><span><b>${photos.length}</b> de ${MAX_RECORD_PHOTOS} foto(s) neste rascunho:</span><small>Ficam guardadas neste aparelho até você salvar o registro</small></div><div class="photo-tray-items">${photos.map((p, i) => `
         <div class="photo-tray-item">
           <img src="${p.dataUrl}" alt="Foto ${i + 1}" loading="lazy">
           <div class="photo-tray-info">
             <span class="photo-tray-name" title="${e(p.name || '')}">${e(p.name || `Foto ${i + 1}`)}</span>
-            <span class="photo-tray-badge">Salva no cache</span>
+            <span class="photo-tray-badge">${p.driveUrl ? 'Enviada' : 'No aparelho'}</span>
           </div>
           <button type="button" class="photo-tray-remove" data-remove-photo="${p.id}" data-front="${frontKey}" title="Remover esta foto">×</button>
         </div>`).join('')}</div>`;
@@ -324,11 +327,11 @@ function renderPhotoTray(frontKey) {
   }
 
   if (banner) {
-    const hasAnyDraft = hasFrontDraft(frontKey);
+    const hasAnyDraft = photos.length > 0 || hasFrontDraft(frontKey);
     banner.hidden = !hasAnyDraft;
     if (hasAnyDraft) {
       const count = photos.length;
-      banner.innerHTML = `<span class="draft-badge">💾 Rascunho em cache</span><span>${count ? `<b>${count} foto(s)</b> anexada(s)` : 'Dados preenchidos'} no cache desta aba. Você pode ir para outras abas que tudo continua salvo até publicar.</span><button type="button" class="text-button" data-discard-draft="${e(frontKey)}">Descartar rascunho</button>`;
+      banner.innerHTML = `<span class="draft-badge">💾 Rascunho em cache</span><span>${count ? `<b>${count} foto(s)</b> anexada(s)` : 'Dados preenchidos'} neste aparelho. Ainda não foi para a planilha: toque em Salvar registro e fotos para enviar.</span><button type="button" class="text-button" data-discard-draft="${e(frontKey)}">Descartar rascunho</button>`;
     }
   }
 }
@@ -366,7 +369,7 @@ async function loadFrontPhotos(frontKey, force = false) {
   if (demo || state.photoLoading[frontKey] || (!force && state.frontPhotos[frontKey])) return;
   state.photoLoading[frontKey] = true;
   try {
-    const result = await fetchJson(`/api/fotos?front=${encodeURIComponent(frontKey)}&limit=12`, { timeout: 15000 });
+    const result = await fetchJson(`/api/fotos?front=${encodeURIComponent(frontKey)}&limit=40`, { timeout: 15000 });
     state.frontPhotos[frontKey] = result.photos || [];
     gallery.innerHTML = photoGallery(frontKey);
   } catch (error) {
@@ -401,70 +404,110 @@ function resizePhoto(file) {
   });
 }
 
+function friendlyError(error) {
+  if (error.name === 'AbortError') return 'O servidor demorou demais para responder. Confira a internet e tente de novo.';
+  if (error.message === 'Failed to fetch') return 'Sem conexão com o servidor. Confira a internet e tente de novo.';
+  return error.message;
+}
+
+function setupProblem(auth, withPhotos = true) {
+  if (auth.serverless) return 'Esta publicação está sem o servidor. Registros e fotos não podem ser gravados aqui.';
+  if (!auth.writeEnabled) return 'Falta configurar na Vercel: REPORTS_ACCESS_CODE e REPORTS_SESSION_SECRET.';
+  if (auth.setup && !auth.setup.sheet) return 'Falta configurar na Vercel a conta Google: GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY e GOOGLE_SHEET_ID.';
+  if (withPhotos && auth.setup && !auth.setup.drive) return auth.setup.driveError;
+  return '';
+}
+
+// Confere a configuração e o login antes de enviar. Devolve false quando falta digitar o código.
+async function ensureEntryAccess(box, withPhotos) {
+  const auth = await fetchJson('/api/relatorios-acesso', { timeout: 12000 });
+  const problem = setupProblem(auth, withPhotos);
+  if (problem) throw new Error(problem);
+  const input = box.querySelector('[data-access-code]');
+  if (auth.authenticated) {
+    box.hidden = true;
+    return true;
+  }
+  const code = input.value.trim();
+  if (!code) {
+    box.hidden = false;
+    input.focus();
+    return false;
+  }
+  await fetchJson('/api/relatorios-acesso', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+  input.value = '';
+  box.hidden = true;
+  return true;
+}
+
+// Uma nova tentativa cobre falha momentânea da rede ou do Drive; erro 4xx não adianta repetir.
+async function uploadPhoto(body) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const result = await fetchJson('/api/fotos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), timeout: 45000 });
+      return result.photo?.driveUrl || '';
+    } catch (error) {
+      if (attempt >= 1 || (error.status >= 400 && error.status < 500)) throw error;
+    }
+  }
+}
+
+function persistDraft(front, form) {
+  saveFrontDraft(front, { ...serializeForm(form), recordId: getFrontDraft(front)?.recordId });
+}
+
 async function saveFrontRecord(form) {
   const front = form.dataset.frontForm;
   const status = form.querySelector('[data-front-form-status]');
   const button = form.querySelector('[type="submit"]');
+  const accessBox = form.querySelector('[data-front-access]');
   const data = new FormData(form);
   const frontBody = form.closest('.front-body');
 
-  const draft = getFrontDraft(front) || { photos: [] };
-  const cachedPhotos = draft.photos || [];
-
-  const recordId = `SAFE-${String(data.get('date') || dayKeyInSaoPaulo()).replaceAll('-', '')}-${front}-${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
+  if (demo) {
+    if (status) status.textContent = 'Modo demonstração: nada é gravado.';
+    return;
+  }
 
   button.disabled = true;
   if (frontBody) frontBody.dataset.editing = 'true';
-  if (status) status.textContent = 'Processando registro e fotos…';
+  if (status) status.textContent = 'Conferindo o acesso…';
 
   try {
-    const photoUrls = [];
-    const savedPhotosList = [];
+    const photos = await listDraftPhotos(front);
+    if (!await ensureEntryAccess(accessBox, photos.length > 0)) {
+      if (status) status.textContent = 'Digite o código de acesso e toque em Salvar de novo. Nada se perdeu.';
+      return;
+    }
 
-    for (let index = 0; index < cachedPhotos.length; index++) {
-      if (status) status.textContent = `Enviando foto ${index + 1} de ${cachedPhotos.length}…`;
-      const p = cachedPhotos[index];
-      let driveUrl = '';
-      try {
-        const result = await fetchJson('/api/fotos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            dataUrl: p.dataUrl,
-            originalName: p.name,
-            width: p.width,
-            height: p.height,
+    // O ID fica no rascunho: tentar de novo não duplica as fotos que já foram para o Drive.
+    const recordId = getFrontDraft(front)?.recordId || `SAFE-${String(data.get('date') || dayKeyInSaoPaulo()).replaceAll('-', '')}-${front}-${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
+    saveFrontDraft(front, { ...serializeForm(form), recordId });
+
+    const photoUrls = [];
+    for (const [index, photo] of photos.entries()) {
+      if (status) status.textContent = `Enviando foto ${index + 1} de ${photos.length}…`;
+      if (!photo.driveUrl) {
+        try {
+          photo.driveUrl = await uploadPhoto({
+            dataUrl: photo.dataUrl,
+            originalName: photo.name,
+            width: photo.width,
+            height: photo.height,
             recordId,
             front,
             date: data.get('date'),
             sector: data.get('sector'),
             caption: data.get('photoCaption')
-          }),
-          timeout: 45000
-        });
-        driveUrl = result.photo?.driveUrl || '';
-      } catch (uploadErr) {
-        console.warn('Upload remoto não disponível, armazenando localmente:', uploadErr);
+          });
+        } catch (error) {
+          error.message = `Foto ${index + 1} de ${photos.length}: ${friendlyError(error)}`;
+          throw error;
+        }
+        await putDraftPhoto(photo);
+        renderPhotoTray(front);
       }
-
-      const photoEntry = {
-        id: p.id,
-        recordId,
-        front,
-        frontLabel: frontLabel(front),
-        name: p.name,
-        date: data.get('date'),
-        sector: data.get('sector'),
-        caption: data.get('photoCaption') || '',
-        dataUrl: p.dataUrl,
-        contentUrl: driveUrl || p.dataUrl
-      };
-      savedPhotosList.push(photoEntry);
-      if (driveUrl) photoUrls.push(driveUrl);
-    }
-
-    if (savedPhotosList.length) {
-      saveLocalPhotos(savedPhotosList);
+      photoUrls.push(photo.driveUrl);
     }
 
     if (status) status.textContent = 'Gravando os dados do registro…';
@@ -474,65 +517,116 @@ async function saveFrontRecord(form) {
     payload.registered = Boolean(form.elements.registered?.checked);
     payload.photoUrls = photoUrls;
 
-    let destination = 'inspections';
-    if (front === 'actions') destination = 'pending';
-    else if (front === 'training') destination = 'dds';
-    else if (front === 'epi') destination = 'epi';
+    await fetchJson('/api/registros', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      timeout: 25000
+    });
 
-    try {
-      await fetchJson('/api/registros', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        timeout: 25000
-      });
-    } catch (saveErr) {
-      console.warn('Gravação remota não disponível, armazenando localmente:', saveErr);
-    }
-
-    const localRecord = {
-      ...payload,
-      type: destination,
-      rowKey: `local-${recordId}`,
-      recordDate: data.get('date'),
-      condition: data.get('description'),
-      topic: data.get('description'),
-      activity: data.get('description'),
-      date: data.get('date'),
-      evidence: photoUrls.join(' | ')
-    };
-    saveLocalRecord(localRecord);
-
+    // A planilha é a fonte oficial; a cópia abaixo só mostra o registro até a próxima leitura.
+    const destination = front === 'actions' ? 'pending' : front === 'training' ? 'dds' : 'inspections';
     if (state.data && Array.isArray(state.data[destination])) {
-      state.data[destination].unshift(localRecord);
+      state.data[destination].unshift({
+        ...payload,
+        condition: data.get('description'),
+        topic: data.get('description'),
+        evidence: [`ID: ${recordId}`, ...photoUrls].join(' | ')
+      });
     }
 
     clearFrontDraft(front);
+    await clearDraftPhotos(front);
     form.reset();
     form.elements.date.value = dayKeyInSaoPaulo();
-    renderPhotoTray(front);
+    await renderPhotoTray(front);
     if (frontBody) frontBody.dataset.editing = 'false';
 
     if (status) {
-      status.textContent = `✓ Registro e ${cachedPhotos.length} foto(s) salvos com sucesso! Eles já fazem parte dos indicadores e relatórios.`;
+      status.textContent = `✓ Registro salvo na planilha${photos.length ? ` e ${photos.length} foto(s) no Drive` : ''}.`;
     }
 
     state.frontPhotos[front] = null;
     await loadFrontPhotos(front, true);
     render();
   } catch (error) {
-    if (status) {
-      status.innerHTML = `Não foi possível concluir o salvamento: ${e(error.message)}. O rascunho continua preservado no cache.`;
+    if (error.status === 401) {
+      accessBox.hidden = false;
+      accessBox.querySelector('input').focus();
     }
+    if (status) status.textContent = `Não salvou: ${friendlyError(error)} Nada se perdeu: o rascunho continua guardado neste aparelho.`;
   } finally {
     button.disabled = false;
   }
 }
 
 async function checkEntryAccess() {
-  state.entryAccess = true;
-  state.entryConfigured = true;
+  if (demo) return;
+  try {
+    state.entryProblem = setupProblem(await fetchJson('/api/relatorios-acesso', { timeout: 12000 }));
+  } catch {
+    state.entryProblem = '';
+  }
   renderFronts();
+}
+
+// --- REGISTROS QUE FICARAM SÓ NESTE NAVEGADOR ---
+// A versão anterior mostrava "salvo" mesmo quando o envio falhava. O que já chegou à planilha
+// (o ID do lançamento aparece nela) é limpo daqui; o resto pode ser enviado pelo aviso na tela.
+function pendingLocalRecords() {
+  const records = listLocalRecords().filter(record => record.recordId);
+  if (!records.length || !state.data) return [];
+  const sheetText = JSON.stringify(state.data);
+  return records.filter(record => {
+    if (!sheetText.includes(record.recordId)) return true;
+    removeLocalRecord(record.recordId);
+    return false;
+  });
+}
+
+function renderSyncBanner() {
+  const banner = $('local-sync-banner');
+  if (!banner || state.syncing) return;
+  const pending = pendingLocalRecords();
+  banner.hidden = !pending.length;
+  const count = banner.querySelector('[data-sync-count]');
+  if (count) count.textContent = pending.length;
+}
+
+async function syncLocalRecords() {
+  const banner = $('local-sync-banner');
+  const status = banner.querySelector('[data-sync-status]');
+  const button = banner.querySelector('[data-sync-button]');
+  const accessBox = banner.querySelector('[data-front-access]');
+  state.syncing = true;
+  button.disabled = true;
+  try {
+    const pending = pendingLocalRecords();
+    const localPhotos = listLocalPhotos();
+    if (!await ensureEntryAccess(accessBox, localPhotos.length > 0)) {
+      status.textContent = 'Digite o código de acesso e toque em Enviar de novo.';
+      return;
+    }
+    for (const [index, record] of pending.entries()) {
+      status.textContent = `Enviando registro ${index + 1} de ${pending.length}…`;
+      const photoUrls = (record.photoUrls || []).filter(url => url.startsWith('https://drive.google.com/'));
+      for (const photo of localPhotos.filter(item => item.recordId === record.recordId && String(item.contentUrl || '').startsWith('data:'))) {
+        const url = await uploadPhoto({ dataUrl: photo.dataUrl, originalName: photo.name, recordId: record.recordId, front: record.front, date: photo.date, sector: photo.sector, caption: photo.caption });
+        if (url) photoUrls.push(url);
+      }
+      await fetchJson('/api/registros', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...record, photoUrls }), timeout: 25000 });
+      removeLocalRecord(record.recordId);
+    }
+    status.textContent = '✓ Tudo enviado para a planilha.';
+    state.frontPhotos = {};
+    await load(true);
+  } catch (error) {
+    status.textContent = `Não enviou: ${friendlyError(error)} Os registros continuam guardados aqui.`;
+  } finally {
+    state.syncing = false;
+    button.disabled = false;
+    renderSyncBanner();
+  }
 }
 
 function renderFront(frontKey) {
@@ -779,6 +873,7 @@ async function load(manual = false) {
       state.data = data; state.etag = response.headers.get('etag') || ''; populateOptions(); render();
     }
     state.failures=0;
+    renderSyncBanner();
     // Passou da meia-noite com a página aberta? O recorte anda para o novo dia.
     if (viradaDoDia()) { applyFilters(); }
     $('data-status').textContent = demo ? 'DEMONSTRAÇÃO · dados fictícios, não são os registros da sua planilha.' : state.data.message;
@@ -863,9 +958,7 @@ document.querySelector('.fronts-list').addEventListener('input', event => {
     const front = form.dataset.frontForm;
     const frontBody = form.closest('.front-body');
     if (frontBody) frontBody.dataset.editing = 'true';
-    const draft = getFrontDraft(front) || { photos: [] };
-    const updated = { ...serializeForm(form), photos: draft.photos || [] };
-    saveFrontDraft(front, updated);
+    persistDraft(front, form);
   }
 });
 
@@ -877,57 +970,56 @@ document.querySelector('.fronts-list').addEventListener('change', async event =>
     const files = [...(event.target.files || [])];
     if (!files.length) return;
     const status = form.querySelector('[data-front-form-status]');
-    if (status) status.textContent = 'Processando e guardando foto(s) no cache…';
     const frontBody = form.closest('.front-body');
     if (frontBody) frontBody.dataset.editing = 'true';
 
-    const draft = getFrontDraft(front) || serializeForm(form);
-    draft.photos = draft.photos || [];
-
-    for (const file of files) {
-      if (draft.photos.length >= 8) {
-        if (status) status.textContent = 'Limite de 8 fotos por registro atingido.';
-        break;
-      }
+    event.target.value = '';
+    let total = (await listDraftPhotos(front)).length;
+    const accepted = files.slice(0, Math.max(0, MAX_RECORD_PHOTOS - total));
+    const errors = [];
+    for (const [index, file] of accepted.entries()) {
+      if (status) status.textContent = `Preparando foto ${index + 1} de ${accepted.length}…`;
       try {
         const photo = await resizePhoto(file);
-        draft.photos.push({
+        await putDraftPhoto({
           id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          front,
+          addedAt: Date.now(),
           name: file.name,
           dataUrl: photo.dataUrl,
           width: photo.width,
           height: photo.height
         });
+        total++;
       } catch (err) {
-        if (status) status.textContent = err.message;
+        errors.push(err.message);
       }
     }
-    saveFrontDraft(front, { ...serializeForm(form), photos: draft.photos });
-    renderPhotoTray(front);
-    if (status) status.textContent = `${draft.photos.length} foto(s) guardadas no cache. Elas permanecem salvas mesmo se você mudar de aba!`;
-    event.target.value = '';
+    persistDraft(front, form);
+    await renderPhotoTray(front);
+    const skipped = files.length - accepted.length;
+    if (status) status.textContent = [
+      `${total} de ${MAX_RECORD_PHOTOS} foto(s) neste rascunho.`,
+      skipped ? `${skipped} ficaram de fora pelo limite de ${MAX_RECORD_PHOTOS}.` : '',
+      ...errors
+    ].filter(Boolean).join(' ');
     return;
   }
-  const draft = getFrontDraft(front) || { photos: [] };
-  saveFrontDraft(front, { ...serializeForm(form), photos: draft.photos || [] });
+  persistDraft(front, form);
 });
 
-document.querySelector('.fronts-list').addEventListener('click', event => {
+document.querySelector('.fronts-list').addEventListener('click', async event => {
   const removePhotoId = event.target.dataset?.removePhoto;
   const discardFront = event.target.dataset?.discardDraft;
   if (removePhotoId) {
-    const front = event.target.dataset.front;
-    const draft = getFrontDraft(front);
-    if (draft && Array.isArray(draft.photos)) {
-      draft.photos = draft.photos.filter(p => p.id !== removePhotoId);
-      saveFrontDraft(front, draft);
-      renderPhotoTray(front);
-    }
+    await removeDraftPhoto(removePhotoId);
+    renderPhotoTray(event.target.dataset.front);
     return;
   }
   if (discardFront) {
     if (confirm('Deseja descartar as fotos e informações salvas no cache desta frente?')) {
       clearFrontDraft(discardFront);
+      await clearDraftPhotos(discardFront);
       const form = document.querySelector(`.front-entry-form[data-front-form="${discardFront}"]`);
       if (form) {
         form.reset();
@@ -970,4 +1062,5 @@ try { state.paused = localStorage.getItem('safe-pausado') === '1'; } catch {}
 try { const salvo = localStorage.getItem('safe-periodo'); if (salvo && (PERIODOS[salvo] || salvo === 'custom')) state.periodo = salvo; } catch {}
 aplicarPeriodo(state.periodo, { recarregar: false });
 state.filters = validateFilters(state.filters);
-syncControls(); syncPeriodo(); syncLive(); checkEntryAccess(); load();
+$('local-sync-banner')?.querySelector('[data-sync-button]').addEventListener('click', syncLocalRecords);
+syncControls(); syncPeriodo(); syncLive(); migrateDraftPhotos().catch(() => {}).finally(checkEntryAccess); load();
