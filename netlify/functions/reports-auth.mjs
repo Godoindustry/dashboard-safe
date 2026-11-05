@@ -25,7 +25,7 @@ function tooManyAttempts(event) {
 function setupStatus() {
   const drive = driveConfiguration();
   return {
-    sheet: Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_SHEET_ID),
+    sheet: Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY),
     drive: drive.ready,
     driveError: drive.ready ? "" : drive.error,
   };

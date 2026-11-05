@@ -97,8 +97,11 @@
       <div class="local-sync-banner" id="local-sync-banner" hidden>
         <p><strong>⚠️ <span data-sync-count>0</span> registro(s) estão só neste aparelho.</strong> Eles apareceram como salvos, mas não chegaram à planilha. Envie agora para não perder.</p>
         <label class="front-access" data-front-access hidden>Código de acesso<input data-access-code type="password" autocomplete="current-password" maxlength="100" placeholder="O mesmo da área de Relatórios"></label>
-        <button class="button primary" type="button" data-sync-button>Enviar para a planilha</button>
-        <span class="front-form-status" data-sync-status aria-live="polite"></span>
+        <div class="local-sync-actions">
+          <button class="button primary" type="button" data-sync-button>Enviar para a planilha</button>
+          <button class="button ghost" type="button" data-sync-later>Deixar para depois</button>
+        </div>
+        <p class="sync-result" data-sync-status aria-live="polite" hidden></p>
       </div>
       <div class="fronts-list">
         <details class="front-item" data-front="safety">

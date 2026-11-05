@@ -471,7 +471,10 @@ async function saveFrontRecord(form) {
 
   button.disabled = true;
   if (frontBody) frontBody.dataset.editing = 'true';
-  if (status) status.textContent = 'Conferindo o acesso…';
+  if (status) {
+    status.textContent = 'Conferindo o acesso…';
+    status.classList.remove('is-error');
+  }
 
   try {
     const photos = await listDraftPhotos(front);
@@ -554,7 +557,10 @@ async function saveFrontRecord(form) {
       accessBox.hidden = false;
       accessBox.querySelector('input').focus();
     }
-    if (status) status.textContent = `Não salvou: ${friendlyError(error)} Nada se perdeu: o rascunho continua guardado neste aparelho.`;
+    if (status) {
+      status.textContent = `Não salvou: ${friendlyError(error)} Nada se perdeu: o rascunho continua guardado neste aparelho.`;
+      status.classList.add('is-error');
+    }
   } finally {
     button.disabled = false;
   }
@@ -588,27 +594,37 @@ function renderSyncBanner() {
   const banner = $('local-sync-banner');
   if (!banner || state.syncing) return;
   const pending = pendingLocalRecords();
-  banner.hidden = !pending.length;
+  let postponed = false;
+  try { postponed = localStorage.getItem('safe-envio-adiado') === dayKeyInSaoPaulo(); } catch {}
+  banner.hidden = !pending.length || postponed;
   const count = banner.querySelector('[data-sync-count]');
   if (count) count.textContent = pending.length;
 }
 
 async function syncLocalRecords() {
   const banner = $('local-sync-banner');
-  const status = banner.querySelector('[data-sync-status]');
+  const result = banner.querySelector('[data-sync-status]');
   const button = banner.querySelector('[data-sync-button]');
   const accessBox = banner.querySelector('[data-front-access]');
+  const show = (text, kind = '') => {
+    result.textContent = text;
+    result.className = `sync-result ${kind}`;
+    result.hidden = false;
+  };
+  const label = button.textContent;
   state.syncing = true;
   button.disabled = true;
+  button.textContent = 'Enviando…';
+  show('Conferindo o acesso…');
   try {
     const pending = pendingLocalRecords();
     const localPhotos = listLocalPhotos();
     if (!await ensureEntryAccess(accessBox, localPhotos.length > 0)) {
-      status.textContent = 'Digite o código de acesso e toque em Enviar de novo.';
+      show('Digite o código de acesso acima e clique em Enviar para a planilha de novo.', 'is-error');
       return;
     }
     for (const [index, record] of pending.entries()) {
-      status.textContent = `Enviando registro ${index + 1} de ${pending.length}…`;
+      show(`Enviando registro ${index + 1} de ${pending.length}…`);
       const photoUrls = (record.photoUrls || []).filter(url => url.startsWith('https://drive.google.com/'));
       for (const photo of localPhotos.filter(item => item.recordId === record.recordId && String(item.contentUrl || '').startsWith('data:'))) {
         const url = await uploadPhoto({ dataUrl: photo.dataUrl, originalName: photo.name, recordId: record.recordId, front: record.front, date: photo.date, sector: photo.sector, caption: photo.caption });
@@ -617,14 +633,16 @@ async function syncLocalRecords() {
       await fetchJson('/api/registros', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...record, photoUrls }), timeout: 25000 });
       removeLocalRecord(record.recordId);
     }
-    status.textContent = '✓ Tudo enviado para a planilha.';
+    show('✓ Tudo enviado para a planilha.', 'is-success');
     state.frontPhotos = {};
     await load(true);
   } catch (error) {
-    status.textContent = `Não enviou: ${friendlyError(error)} Os registros continuam guardados aqui.`;
+    if (error.status === 401) accessBox.hidden = false;
+    show(`Não enviou: ${friendlyError(error)} Os registros continuam guardados aqui.`, 'is-error');
   } finally {
     state.syncing = false;
     button.disabled = false;
+    button.textContent = label;
     renderSyncBanner();
   }
 }
@@ -1063,4 +1081,8 @@ try { const salvo = localStorage.getItem('safe-periodo'); if (salvo && (PERIODOS
 aplicarPeriodo(state.periodo, { recarregar: false });
 state.filters = validateFilters(state.filters);
 $('local-sync-banner')?.querySelector('[data-sync-button]').addEventListener('click', syncLocalRecords);
+$('local-sync-banner')?.querySelector('[data-sync-later]').addEventListener('click', () => {
+  try { localStorage.setItem('safe-envio-adiado', dayKeyInSaoPaulo()); } catch {}
+  $('local-sync-banner').hidden = true;
+});
 syncControls(); syncPeriodo(); syncLive(); migrateDraftPhotos().catch(() => {}).finally(checkEntryAccess); load();

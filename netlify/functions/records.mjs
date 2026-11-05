@@ -1,6 +1,6 @@
 import { isReportAuthenticated } from "./_shared/auth.mjs";
 import { FRONT_LABELS, validFront } from "./_shared/fronts.mjs";
-import { appendSiteRecord } from "./_shared/google-sheets.mjs";
+import { appendSiteRecord, configuredSheetId } from "./_shared/google-sheets.mjs";
 import { invalidateSnapshot } from "./_shared/snapshot.mjs";
 
 const STATUS = new Set(["Em aberto", "Em andamento", "Resolvida", "Cancelada"]);
@@ -76,7 +76,7 @@ export async function handler(event) {
   try {
     const parsed = JSON.parse(event.body || "{}");
     const record = normalizeRecord(parsed);
-    await appendSiteRecord(process.env.GOOGLE_SHEET_ID, record.sheetKey, record.values);
+    await appendSiteRecord(configuredSheetId(), record.sheetKey, record.values);
     invalidateSnapshot();
     return reply(201, { saved: true, destination: record.sheetKey, front: record.front });
   } catch (error) {

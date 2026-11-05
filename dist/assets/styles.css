@@ -904,6 +904,16 @@ select { width: 100%; min-height: 44px; font: inherit; padding: .65rem .6rem; bo
 
 /* Avisos de configuração, login e registros presos no aparelho */
 .front-setup-alert, .local-sync-banner { margin: 0 0 12px; padding: 12px 14px; border: 1px solid #e0a100; border-radius: 10px; background: #fff7df; color: #5c4300; }
-.local-sync-banner p { margin: 0 0 10px; }
+.local-sync-banner p { margin: 0 0 10px; color: #4a3600; font-size: .95rem; }
+.local-sync-banner strong { color: #3a2a00; }
+.local-sync-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.local-sync-actions .button.ghost { color: #4a3600; border-color: #b8860b; background: transparent; }
+.local-sync-banner .sync-result { margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: #fff; color: #1f2933; font-size: 1rem; font-weight: 700; }
+.local-sync-banner .sync-result.is-error { background: #fde8e8; color: #9b1c1c; }
+.local-sync-banner .sync-result.is-success { background: #def7ec; color: #03543f; }
+.local-sync-banner .sync-result[hidden] { display: none; }
+.local-sync-banner .front-access { color: #3a2a00; }
+.local-sync-banner .front-access input { padding: 8px 10px; border: 1px solid #b8860b; border-radius: 8px; background: #fff; color: #1f2933; }
+.front-form-status.is-error { padding: 8px 10px; border-radius: 8px; background: #fde8e8; color: #9b1c1c; font-size: .9rem; font-weight: 700; }
 .local-sync-banner[hidden], .front-access[hidden] { display: none; }
 .front-access { display: grid; gap: 4px; max-width: 320px; margin: 0 0 12px; font-weight: 600; }

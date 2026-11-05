@@ -138,6 +138,11 @@ function valueForHeader(header, values) {
   return field ? values[field] ?? "" : "";
 }
 
+// A leitura e a gravação precisam apontar para a mesma planilha, com ou sem a variável na Vercel.
+export function configuredSheetId() {
+  return process.env.GOOGLE_SHEET_ID || "1BcHzuaOFOm2MMs11l-BNBzMmlnzdHdPrnhSnIPk7z30";
+}
+
 export async function appendSiteRecord(spreadsheetId, sheetKey, values) {
   if (!STRUCTURED_KEYS.has(sheetKey) || sheetKey === "absences") throw new Error("Destino de lançamento inválido.");
   const sheetName = SHEETS[sheetKey];
