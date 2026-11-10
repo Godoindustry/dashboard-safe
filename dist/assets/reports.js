@@ -1,11 +1,13 @@
 import './theme.js';
 import { fetchJson, escapeHtml as e, formatDate, toDateKey } from './shared.js';
 import { buildReport } from './report-model.js';
-import { saveReportToHistory, listSavedReports, deleteSavedReport, getSavedReport, listLocalPhotos } from './storage.js';
+import { saveReportToHistory, listSavedReports, deleteSavedReport, getSavedReport, listLocalPhotos, listDraftPhotos, putDraftPhoto, removeDraftPhoto, clearDraftPhotos } from './storage.js';
 
 const $ = id => document.getElementById(id), demo = new URLSearchParams(location.search).get('demo') === '1';
 const state = { data: null, report: null, type: 'daily', etag: '', timer: null, loading: false, aiBusy: false, photos: [], photoRequest: 0 };
 const MAX_PHOTOS = 20, MAX_SIDE = 1400;
+// As fotos anexadas nesta página ficam no IndexedDB: sair da página não pode apagá-las.
+const REPORT_DRAFT = 'relatorio';
 
 // Fotos extras da prévia são reduzidas no navegador; as evidências oficiais vêm do Drive ou do armazenamento local.
 function readPhoto(file) {
@@ -39,6 +41,7 @@ function renderPhotos() {
     const badge = p.source === 'drive' ? 'Google Drive' : p.source === 'local-evidence' ? 'Frente salva' : 'Anexo';
     return `<figure class="photo-item"><img src="${p.dataUrl || e(p.contentUrl)}" alt="Foto ${i + 1}: ${e(p.name || '')}"><label class="photo-caption">Legenda<input type="text" maxlength="160" data-photo-caption="${p.id}" value="${e(p.caption || '')}" placeholder="Onde foi, o que mostra"></label><div class="photo-item-footer"><span class="count-badge">${badge}</span><button class="button ghost" type="button" data-photo-remove="${p.id}">Remover</button></div></figure>`;
   }).join('');
+  $('report-photos-clear').hidden = !list.some(p => p.source === 'local');
   $('report-photo-preview').innerHTML = list.length ? list.map((p, i) => `<figure><img src="${p.dataUrl || e(p.contentUrl)}" alt="Foto ${i + 1}"><figcaption>Foto ${i + 1}${p.caption ? ` — ${e(p.caption)}` : ''}</figcaption></figure>`).join('') : '<p class="report-empty">Nenhuma foto anexada a este relatório.</p>';
   if (state.report) state.report.photos = list;
 }
@@ -72,7 +75,8 @@ async function syncDrivePhotos() {
     }
     if (request !== state.photoRequest) return;
     const combined = [...drive, ...localEvidence].sort((a, b) => String(a.frontLabel).localeCompare(String(b.frontLabel), 'pt-BR') || String(a.date).localeCompare(String(b.date)));
-    state.photos = [...combined, ...locals].slice(0, MAX_PHOTOS);
+    // As anexadas à mão sempre entram; as automáticas completam até o limite.
+    state.photos = [...combined.slice(0, Math.max(0, MAX_PHOTOS - locals.length)), ...locals];
     renderPhotos();
   } catch (error) {
     if (request === state.photoRequest) status(`Prévia pronta com fotos disponíveis.`);
@@ -100,7 +104,11 @@ async function addPhotos(files) {
   const selecionadas = [...files].slice(0, livres);
   const ignoradas = files.length - selecionadas.length;
   for (const file of selecionadas) {
-    try { state.photos.push(await readPhoto(file)); }
+    try {
+      const photo = await readPhoto(file);
+      state.photos.push(photo);
+      await putDraftPhoto({ ...photo, front: REPORT_DRAFT, addedAt: Date.now() });
+    }
     catch (error) { status(error.message); }
   }
   renderPhotos();
@@ -208,6 +216,8 @@ async function load() {
     $('report-sector').innerHTML = '<option value="">Todos os setores</option>' + sectors.map(s => `<option value="${e(s)}">${e(s)}</option>`).join('');
     $('report-sector').value = selection;
     if (!state.report) {
+      const saved = await listDraftPhotos(REPORT_DRAFT);
+      if (saved.length && !state.photos.length) state.photos = saved.map(({ front, addedAt, ...photo }) => photo);
       createPreview();
       await syncDrivePhotos();
     } else if (changed) {
@@ -334,9 +344,19 @@ $('report-photo-list').addEventListener('click', event => {
   const id = event.target.dataset?.photoRemove;
   if (!id) return;
   state.photos = state.photos.filter(p => p.id !== id);
+  removeDraftPhoto(id);
   renderPhotos();
   status(`Foto removida. ${state.photos.length} foto(s) no relatório.`);
 });
+
+$('report-photos-clear').addEventListener('click', async () => {
+  state.photos = state.photos.filter(p => p.source !== 'local');
+  await clearDraftPhotos(REPORT_DRAFT);
+  renderPhotos();
+  status(`Fotos anexadas removidas. ${state.photos.length} foto(s) no relatório.`);
+});
+
+let captionTimer = null;
 
 $('report-photo-list').addEventListener('input', event => {
   const id = event.target.dataset?.photoCaption;
@@ -344,6 +364,10 @@ $('report-photo-list').addEventListener('input', event => {
   const photo = state.photos.find(p => p.id === id);
   if (!photo) return;
   photo.caption = event.target.value;
+  if (photo.source === 'local') {
+    clearTimeout(captionTimer);
+    captionTimer = setTimeout(() => putDraftPhoto({ ...photo, front: REPORT_DRAFT }), 400);
+  }
   const idx = state.photos.indexOf(photo);
   const captions = $('report-photo-preview').querySelectorAll('figcaption');
   if (captions[idx]) captions[idx].textContent = `Foto ${idx + 1}${photo.caption ? ` — ${photo.caption}` : ''}`;
