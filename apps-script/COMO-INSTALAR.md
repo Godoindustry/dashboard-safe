@@ -9,16 +9,17 @@ Instale com a conta Google que vai guardar as fotos e que tem permissão de edit
 3. No topo, escolha a função **configurar** e clique em **Executar**.
    - O Google pede permissão: **Revisar permissões** → escolha sua conta → **Avançado** → **Acessar (não seguro)** → **Permitir**.
      O aviso aparece porque o script é seu e não passou por revisão do Google; ele só mexe nesta planilha e na pasta que cria.
-   - Embaixo, no **Registro de execução**, aparece uma sequência longa: é o **token**. Copie.
+   - Não precisa copiar nada do registro: o dashboard se conecta sozinho.
 4. **Implantar → Nova implantação** → engrenagem → **App da Web**.
    - Executar como: **Eu**. Quem pode acessar: **Qualquer pessoa**. → **Implantar**.
    - Copie o **URL do app da Web** (termina em `/exec`).
-5. Na Vercel (projeto dashboard-safe → Settings → Environment Variables), crie:
-   - `GOOGLE_APPS_SCRIPT_URL` = o link do passo 4
-   - `GOOGLE_APPS_SCRIPT_TOKEN` = o token do passo 3
+5. Na Vercel (projeto dashboard-safe → Settings → Environment Variables), crie só
+   `GOOGLE_APPS_SCRIPT_URL` = o link do passo 4.
 6. Vercel → **Deployments** → três pontinhos da publicação mais recente → **Redeploy**.
+7. Abra `https://dashboard-safe-sooty.vercel.app/api/relatorios-acesso?verificar=1` em até 7 dias.
+   Deve aparecer `"script":"ok"`: o dashboard e o script se parearam.
 
-Pronto. O "Qualquer pessoa" do passo 4 é seguro: sem o token o script recusa tudo.
+O "Qualquer pessoa" do passo 4 é seguro: depois do pareamento o script só aceita o dashboard.
 
 Se um dia trocar o código do script, use **Implantar → Gerenciar implantações → editar → Nova versão**,
 assim o link continua o mesmo.

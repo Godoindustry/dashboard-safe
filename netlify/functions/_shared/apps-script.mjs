@@ -2,10 +2,16 @@
 // Alternativa à conta de serviço: grava na planilha e guarda arquivos no Drive de quem
 // instalou o script, sem chave do Google na Vercel e sem precisar de Google Workspace.
 
+import crypto from "node:crypto";
+
+// Sem GOOGLE_APPS_SCRIPT_TOKEN, o token sai do segredo de sessão que já existe na Vercel:
+// o script aceita o primeiro token recebido após a instalação (pareamento) e só ele depois.
 function config() {
+  const secret = String(process.env.REPORTS_SESSION_SECRET || "");
+  const derived = secret.length >= 16 ? crypto.createHmac("sha256", secret).update("safe-apps-script").digest("hex") : "";
   return {
     url: String(process.env.GOOGLE_APPS_SCRIPT_URL || "").trim(),
-    token: String(process.env.GOOGLE_APPS_SCRIPT_TOKEN || "").trim(),
+    token: String(process.env.GOOGLE_APPS_SCRIPT_TOKEN || "").trim() || derived,
   };
 }
 
@@ -16,8 +22,8 @@ export function appsScriptConfigured() {
 
 export function appsScriptProblem() {
   const { url, token } = config();
-  if (!url && !token) return "";
-  if (!url || !token) return "Configure as duas variáveis GOOGLE_APPS_SCRIPT_URL e GOOGLE_APPS_SCRIPT_TOKEN na Vercel.";
+  if (!url) return "";
+  if (!token) return "Configure REPORTS_SESSION_SECRET na Vercel para o dashboard se conectar ao script da planilha.";
   if (!appsScriptConfigured()) return "GOOGLE_APPS_SCRIPT_URL precisa ser o link do App da Web, terminado em /exec.";
   return "";
 }

@@ -1,5 +1,5 @@
 import { driveConfiguration } from "./_shared/google-drive.mjs";
-import { appsScriptProblem } from "./_shared/apps-script.mjs";
+import { appsScriptConfigured, appsScriptProblem, callAppsScript } from "./_shared/apps-script.mjs";
 import { sheetWriteReady } from "./_shared/google-sheets.mjs";
 import { clearSessionCookie, createSessionCookie, isReportAuthenticated, reportsProtectionEnabled, verifyAccessCode } from "./_shared/auth.mjs";
 
@@ -35,7 +35,19 @@ function setupStatus() {
 }
 
 export async function handler(event) {
-  if (event.httpMethod === "GET") return reply(200, { protected: reportsProtectionEnabled(), authenticated: isReportAuthenticated(event), writeEnabled: Boolean(process.env.REPORTS_ACCESS_CODE && process.env.REPORTS_SESSION_SECRET), setup: setupStatus() });
+  if (event.httpMethod === "GET") {
+    const setup = setupStatus();
+    // ?verificar=1 chama o script de verdade (e faz o pareamento na primeira vez).
+    if (event.queryStringParameters?.verificar === "1" && appsScriptConfigured()) {
+      try {
+        await callAppsScript("ping", {}, 20000);
+        setup.script = "ok";
+      } catch (error) {
+        setup.script = error.message;
+      }
+    }
+    return reply(200, { protected: reportsProtectionEnabled(), authenticated: isReportAuthenticated(event), writeEnabled: Boolean(process.env.REPORTS_ACCESS_CODE && process.env.REPORTS_SESSION_SECRET), setup });
+  }
   if (event.httpMethod === "DELETE") return reply(200, { authenticated: false }, { "Set-Cookie": clearSessionCookie() });
   if (event.httpMethod !== "POST") return reply(405, { error: "Método não permitido." });
   if (!reportsProtectionEnabled()) return reply(200, { protected: false, authenticated: true, writeEnabled: false });

@@ -8,25 +8,47 @@ const SAFE_SHEET_ID = '1BcHzuaOFOm2MMs11l-BNBzMmlnzdHdPrnhSnIPk7z30';
 const SAFE_FOLDER_NAME = 'SAFE - Evidências e relatórios';
 const SAFE_APP = 'dashboard-safe';
 
-// Rode esta função uma vez pelo editor: cria a pasta e mostra o token para a Vercel.
+const SAFE_PAREAMENTO_DIAS = 7;
+
+// Rode esta função uma vez pelo editor: autoriza o script e cria a pasta no Drive.
 function configurar() {
   const props = PropertiesService.getScriptProperties();
-  let token = props.getProperty('SAFE_TOKEN');
-  if (!token) {
-    token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
-    props.setProperty('SAFE_TOKEN', token);
-  }
+  if (!props.getProperty('SAFE_CONFIGURADO_EM')) props.setProperty('SAFE_CONFIGURADO_EM', new Date().toISOString());
   pasta_();
   SpreadsheetApp.openById(SAFE_SHEET_ID).getName();
-  Logger.log('Pronto. Copie o token abaixo para a variável GOOGLE_APPS_SCRIPT_TOKEN na Vercel:');
-  Logger.log(token);
+  Logger.log('Pronto. Não precisa copiar nada: o dashboard se conecta sozinho na primeira chamada.');
+}
+
+// Pareamento: o primeiro token do dashboard (64 caracteres hexadecimais) recebido até
+// 7 dias depois da instalação passa a ser o único aceito. Ninguém copia senha à mão.
+function tokenAceito_(recebido) {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('SAFE_PAREADO')) return props.getProperty('SAFE_TOKEN');
+  if (!/^[a-f0-9]{64}$/.test(String(recebido || ''))) return props.getProperty('SAFE_TOKEN');
+  let inicio = props.getProperty('SAFE_CONFIGURADO_EM');
+  if (!inicio) {
+    inicio = new Date().toISOString();
+    props.setProperty('SAFE_CONFIGURADO_EM', inicio);
+  }
+  if (Date.now() - Date.parse(inicio) > SAFE_PAREAMENTO_DIAS * 86400000) return props.getProperty('SAFE_TOKEN');
+  const trava = LockService.getScriptLock();
+  trava.waitLock(10000);
+  try {
+    if (!props.getProperty('SAFE_PAREADO')) {
+      props.setProperty('SAFE_TOKEN', recebido);
+      props.setProperty('SAFE_PAREADO', new Date().toISOString());
+    }
+    return props.getProperty('SAFE_TOKEN');
+  } finally {
+    trava.releaseLock();
+  }
 }
 
 function doPost(e) {
   try {
     const req = JSON.parse(e.postData.contents);
-    const token = PropertiesService.getScriptProperties().getProperty('SAFE_TOKEN');
-    if (!token || req.token !== token) return saida_({ ok: false, error: 'O token do script não confere com GOOGLE_APPS_SCRIPT_TOKEN na Vercel.' });
+    const token = tokenAceito_(req.token);
+    if (!token || req.token !== token) return saida_({ ok: false, error: 'O script da planilha está pareado com outro dashboard. Para refazer, apague as propriedades SAFE_TOKEN e SAFE_PAREADO do script e rode configurar.' });
     const acao = ACOES_[req.action];
     if (!acao) return saida_({ ok: false, error: 'Ação desconhecida.' });
     return saida_(Object.assign({ ok: true }, acao(req)));
@@ -36,6 +58,10 @@ function doPost(e) {
 }
 
 const ACOES_ = {
+  ping: function () {
+    return { pareado: true };
+  },
+
   // Primeiras linhas da aba: o servidor encontra o cabeçalho e monta a linha.
   rows: function (req) {
     const aba = aba_(req.sheetName);

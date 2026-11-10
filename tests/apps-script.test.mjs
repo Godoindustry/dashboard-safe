@@ -47,6 +47,7 @@ function fakeGoogle() {
     DriveApp: { createFolder: () => folder, getFolderById: () => folder, getFileById: (id) => { if (!files.has(id)) throw new Error('não existe'); return files.get(id); } },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (text) => ({ setMimeType: () => ({ text }) }) },
     Logger: { log() {} },
+    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     JSON, Math, String, Object, Date, Error,
   };
   return { context, props, sheets, files };
@@ -57,8 +58,7 @@ test('script da planilha grava registros e fotos pelo mesmo caminho da produçã
   vm.createContext(google.context);
   vm.runInContext(await readFile(new URL('../apps-script/Codigo.gs', import.meta.url), 'utf8'), google.context);
   google.context.configurar();
-  const token = google.props.get('SAFE_TOKEN');
-  assert.ok(token.length >= 32);
+  const token = 'a'.repeat(64);
 
   const url = 'https://script.google.com/macros/s/AKfy-teste_123/exec';
   const realFetch = globalThis.fetch;
@@ -113,7 +113,39 @@ test('script da planilha grava registros e fotos pelo mesmo caminho da produçã
     globalThis.fetch = async (target, init) => new Response(google.context.doPost({ postData: { contents: init.body.replace(token, 'errado') } }).text);
     const refused = await records.handler({ httpMethod: 'POST', headers, body: JSON.stringify({ front: 'safety', recordId, date: '2026-11-10', sector: 'Moinho', description: 'x' }) });
     assert.equal(refused.statusCode, 502);
-    assert.match(JSON.parse(refused.body).error, /token do script não confere/);
+    assert.match(JSON.parse(refused.body).error, /pareado com outro dashboard/);
+  } finally {
+    globalThis.fetch = realFetch;
+    for (const key of Object.keys(process.env)) if (!(key in env)) delete process.env[key];
+    Object.assign(process.env, env);
+  }
+});
+
+test('dashboard e script se pareiam sozinhos e depois o script recusa outro token', async () => {
+  const google = fakeGoogle();
+  vm.createContext(google.context);
+  vm.runInContext(await readFile(new URL('../apps-script/Codigo.gs', import.meta.url), 'utf8'), google.context);
+  google.context.configurar();
+  const url = 'https://script.google.com/macros/s/AKfy-pareamento_1/exec';
+  const realFetch = globalThis.fetch;
+  const env = { ...process.env };
+  globalThis.fetch = async (_target, init) => new Response(google.context.doPost({ postData: { contents: init.body } }).text);
+  Object.assign(process.env, { GOOGLE_APPS_SCRIPT_URL: url, REPORTS_ACCESS_CODE: 'codigo-de-teste-123', REPORTS_SESSION_SECRET: 'segredo-da-vercel-0123456789' });
+  delete process.env.GOOGLE_APPS_SCRIPT_TOKEN;
+  try {
+    const auth = await import('../netlify/functions/reports-auth.mjs');
+    const status = JSON.parse((await auth.handler({ httpMethod: 'GET', headers: {}, queryStringParameters: { verificar: '1' } })).body);
+    assert.equal(status.setup.script, 'ok');
+    assert.equal(status.setup.sheet, true);
+    assert.match(google.props.get('SAFE_TOKEN'), /^[a-f0-9]{64}$/);
+
+    const intruso = JSON.parse(google.context.doPost({ postData: { contents: JSON.stringify({ action: 'ping', token: 'b'.repeat(64) }) } }).text);
+    assert.equal(intruso.ok, false);
+    const curto = JSON.parse(google.context.doPost({ postData: { contents: JSON.stringify({ action: 'ping', token: 'x' }) } }).text);
+    assert.equal(curto.ok, false);
+
+    const depois = JSON.parse((await auth.handler({ httpMethod: 'GET', headers: {}, queryStringParameters: { verificar: '1' } })).body);
+    assert.equal(depois.setup.script, 'ok');
   } finally {
     globalThis.fetch = realFetch;
     for (const key of Object.keys(process.env)) if (!(key in env)) delete process.env[key];
