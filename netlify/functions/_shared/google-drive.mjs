@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { appsScriptConfigured, appsScriptProblem, callAppsScript } from "./apps-script.mjs";
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 const APP_ID = "dashboard-safe";
@@ -23,11 +24,14 @@ function envConfig() {
 
 export function driveConfiguration() {
   const config = envConfig();
+  const scriptProblem = appsScriptProblem();
+  if (scriptProblem) return { ready: false, error: scriptProblem };
+  if (appsScriptConfigured()) return { ready: true, mode: "apps-script", ...config };
   const oauth = Boolean(config.clientId && config.clientSecret && config.refreshToken);
   const serviceAccount = Boolean(config.email && config.privateKey);
   const partialOauth = Boolean(config.clientId || config.clientSecret || config.refreshToken) && !oauth;
   const partialService = Boolean(config.email || config.privateKey) && !serviceAccount;
-  if (!config.folderId) return { ready: false, error: "Configure GOOGLE_DRIVE_FOLDER_ID na Vercel." };
+  if (!config.folderId) return { ready: false, error: "Falta ligar as fotos ao Google Drive: instale o script da planilha (apps-script/COMO-INSTALAR.md) ou configure GOOGLE_DRIVE_FOLDER_ID na Vercel." };
   if (partialOauth || partialService) return { ready: false, error: "As credenciais do Google Drive estão incompletas." };
   if (!oauth && !serviceAccount) return { ready: false, error: "Configure uma conta de serviço ou OAuth do Google Drive." };
   if (serviceAccount && !config.sharedDriveId && !config.subject) {
@@ -136,7 +140,18 @@ async function driveFetch(url, options = {}) {
   throw new Error(message);
 }
 
+function inPeriod(files, start, end) {
+  return files.filter((file) => {
+    const date = file.appProperties?.reportDate || "";
+    return (!start || date >= start) && (!end || date <= end);
+  });
+}
+
 export async function listDriveFiles({ kind, front, reportKey, start, end, limit = 100 } = {}) {
+  if (appsScriptConfigured()) {
+    const { files } = await callAppsScript("list", { kind, front, reportKey, limit: Math.min(1000, Math.max(1, Number(limit) || 100)) });
+    return inPeriod(files || [], start, end);
+  }
   const { config } = await accessToken();
   const clauses = [
     `'${queryEscape(config.folderId)}' in parents`,
@@ -160,16 +175,16 @@ export async function listDriveFiles({ kind, front, reportKey, start, end, limit
     params.set("driveId", config.sharedDriveId);
   }
   const response = await driveFetch(`https://www.googleapis.com/drive/v3/files?${params}`);
-  const files = (await response.json()).files || [];
-  return files.filter((file) => {
-    const date = file.appProperties?.reportDate || "";
-    return (!start || date >= start) && (!end || date <= end);
-  });
+  return inPeriod((await response.json()).files || [], start, end);
 }
 
 export async function getDriveFile(id) {
   const safeId = String(id || "").trim();
   if (!/^[A-Za-z0-9_-]{10,200}$/.test(safeId)) throw new Error("Arquivo inválido.");
+  if (appsScriptConfigured()) {
+    const { file, base64 } = await callAppsScript("get", { id: safeId }, 45000);
+    return { metadata: file, bytes: Buffer.from(base64, "base64") };
+  }
   const metadataResponse = await driveFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(safeId)}?supportsAllDrives=true&fields=id,name,mimeType,size,description,parents,appProperties,webViewLink`);
   const metadata = await metadataResponse.json();
   const config = driveConfiguration();
@@ -179,20 +194,25 @@ export async function getDriveFile(id) {
 }
 
 export async function uploadDriveFile({ name, mimeType, bytes, kind, front = "", reportDate = "", reportKey = "", recordId = "", details = {} }) {
-  const { token, config } = await accessToken();
   const payload = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
+  const appProperties = {
+    safeApp: APP_ID,
+    safeKind: safeProperty(kind, 30),
+    front: safeProperty(front, 60),
+    reportDate: safeProperty(reportDate, 20),
+    reportKey: safeProperty(reportKey, 100),
+    recordId: safeProperty(recordId, 100),
+  };
+  if (appsScriptConfigured()) {
+    const { file } = await callAppsScript("upload", { name: safeProperty(name, 180), mimeType, base64: payload.toString("base64"), appProperties, details }, 55000);
+    return file;
+  }
+  const { token, config } = await accessToken();
   const metadata = {
     name: safeProperty(name, 180),
     parents: [config.folderId],
     mimeType,
-    appProperties: {
-      safeApp: APP_ID,
-      safeKind: safeProperty(kind, 30),
-      front: safeProperty(front, 60),
-      reportDate: safeProperty(reportDate, 20),
-      reportKey: safeProperty(reportKey, 100),
-      recordId: safeProperty(recordId, 100),
-    },
+    appProperties,
     description: JSON.stringify(details).slice(0, 12000),
   };
   const start = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true&fields=id,name,mimeType,size,createdTime,description,parents,appProperties,webViewLink", {

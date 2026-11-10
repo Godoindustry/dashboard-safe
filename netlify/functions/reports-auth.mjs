@@ -1,4 +1,6 @@
 import { driveConfiguration } from "./_shared/google-drive.mjs";
+import { appsScriptProblem } from "./_shared/apps-script.mjs";
+import { sheetWriteReady } from "./_shared/google-sheets.mjs";
 import { clearSessionCookie, createSessionCookie, isReportAuthenticated, reportsProtectionEnabled, verifyAccessCode } from "./_shared/auth.mjs";
 
 const attempts = new Map();
@@ -25,7 +27,8 @@ function tooManyAttempts(event) {
 function setupStatus() {
   const drive = driveConfiguration();
   return {
-    sheet: Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY),
+    sheet: sheetWriteReady() && !appsScriptProblem(),
+    sheetError: appsScriptProblem(),
     drive: drive.ready,
     driveError: drive.ready ? "" : drive.error,
   };

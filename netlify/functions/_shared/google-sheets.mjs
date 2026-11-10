@@ -1,3 +1,4 @@
+import { appsScriptConfigured, callAppsScript } from "./apps-script.mjs";
 import crypto from "node:crypto";
 import { rowsToObjects } from "./data.mjs";
 
@@ -143,17 +144,27 @@ export function configuredSheetId() {
   return process.env.GOOGLE_SHEET_ID || "1BcHzuaOFOm2MMs11l-BNBzMmlnzdHdPrnhSnIPk7z30";
 }
 
+export function sheetWriteReady() {
+  return appsScriptConfigured() || Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY);
+}
+
 export async function appendSiteRecord(spreadsheetId, sheetKey, values) {
   if (!STRUCTURED_KEYS.has(sheetKey) || sheetKey === "absences") throw new Error("Destino de lançamento inválido.");
   const sheetName = SHEETS[sheetKey];
-  const token = await serviceAccountToken();
+  const viaScript = appsScriptConfigured();
+  const token = viaScript ? "" : await serviceAccountToken();
   const safeSheet = `'${sheetName.replaceAll("'", "''")}'`;
-  const headerResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(`${safeSheet}!1:20`)}?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE`, {
-    signal: AbortSignal.timeout(10000),
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!headerResponse.ok) throw new Error(`A aba ${sheetName} não pôde ser preparada para gravação.`);
-  const rows = (await headerResponse.json()).values || [];
+  let rows;
+  if (viaScript) {
+    rows = (await callAppsScript("rows", { sheetName })).values || [];
+  } else {
+    const headerResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(`${safeSheet}!1:20`)}?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE`, {
+      signal: AbortSignal.timeout(10000),
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!headerResponse.ok) throw new Error(`A aba ${sheetName} não pôde ser preparada para gravação.`);
+    rows = (await headerResponse.json()).values || [];
+  }
   const required = sheetKey === "dds" ? ["data", "tema"] : ["data", "setor"];
   const headers = rows.find((row) => {
     const normalizedRow = row.map(normalized);
@@ -161,6 +172,7 @@ export async function appendSiteRecord(spreadsheetId, sheetKey, values) {
   }) || rows.find((row) => row.some((cell) => String(cell || "").trim()));
   if (!headers?.length) throw new Error(`A aba ${sheetName} precisa ter uma linha de cabeçalho antes de receber lançamentos.`);
   const row = headers.map((header) => valueForHeader(header, values));
+  if (viaScript) return callAppsScript("appendRow", { sheetName, row });
   const params = new URLSearchParams({ valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" });
   const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(`${safeSheet}!A:Z`)}:append?${params}`, {
     signal: AbortSignal.timeout(12000),

@@ -1,6 +1,6 @@
 import { isReportAuthenticated } from "./_shared/auth.mjs";
 import { FRONT_LABELS, validFront } from "./_shared/fronts.mjs";
-import { appendSiteRecord, configuredSheetId } from "./_shared/google-sheets.mjs";
+import { appendSiteRecord, configuredSheetId, sheetWriteReady } from "./_shared/google-sheets.mjs";
 import { invalidateSnapshot } from "./_shared/snapshot.mjs";
 
 const STATUS = new Set(["Em aberto", "Em andamento", "Resolvida", "Cancelada"]);
@@ -72,7 +72,7 @@ export async function handler(event) {
   if (event.httpMethod !== "POST") return reply(405, { error: "Método não permitido." });
   if (!protectedReady()) return reply(503, { error: "Para proteger os lançamentos, configure REPORTS_ACCESS_CODE e REPORTS_SESSION_SECRET na Vercel." });
   if (!isReportAuthenticated(event)) return reply(401, { error: "Entre na área de Relatórios antes de registrar dados." });
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) return reply(503, { error: "Configure a conta de serviço Google para gravar na planilha." });
+  if (!sheetWriteReady()) return reply(503, { error: "Falta ligar o dashboard à planilha: instale o script da planilha (apps-script/COMO-INSTALAR.md)." });
   try {
     const parsed = JSON.parse(event.body || "{}");
     const record = normalizeRecord(parsed);

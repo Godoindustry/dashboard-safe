@@ -413,7 +413,7 @@ function friendlyError(error) {
 function setupProblem(auth, withPhotos = true) {
   if (auth.serverless) return 'Esta publicação está sem o servidor. Registros e fotos não podem ser gravados aqui.';
   if (!auth.writeEnabled) return 'Falta configurar na Vercel: REPORTS_ACCESS_CODE e REPORTS_SESSION_SECRET.';
-  if (auth.setup && !auth.setup.sheet) return 'Falta configurar na Vercel a conta Google: GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY e GOOGLE_SHEET_ID.';
+  if (auth.setup && !auth.setup.sheet) return auth.setup.sheetError || 'Falta ligar o dashboard à planilha: instalar o script da planilha e criar GOOGLE_APPS_SCRIPT_URL e GOOGLE_APPS_SCRIPT_TOKEN na Vercel.';
   if (withPhotos && auth.setup && !auth.setup.drive) return auth.setup.driveError;
   return '';
 }

@@ -32,6 +32,8 @@ O fluxo de planilha, fotos e relatórios não precisa de banco de dados externo:
 
 ### Google Drive e gravação pelo site
 
+**Caminho recomendado:** instalar o script da planilha seguindo `apps-script/COMO-INSTALAR.md` e criar `GOOGLE_APPS_SCRIPT_URL` e `GOOGLE_APPS_SCRIPT_TOKEN` na Vercel. Ele grava na planilha e guarda fotos e PDFs no Drive de quem instalou, sem conta de serviço e sem Google Workspace. As opções abaixo continuam valendo como alternativa.
+
 Ative as APIs Google Sheets e Google Drive. Cadastre as variáveis na Vercel. A planilha deve ser compartilhada como **Editor** com `GOOGLE_SERVICE_ACCOUNT_EMAIL`. Para o Drive, escolha um destes modos:
 
 - Google Workspace com Drive compartilhado: adicione a conta de serviço como colaboradora e configure `GOOGLE_DRIVE_SHARED_DRIVE_ID` e `GOOGLE_DRIVE_FOLDER_ID`.
