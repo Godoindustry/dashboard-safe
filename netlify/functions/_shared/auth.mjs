@@ -28,7 +28,12 @@ export function reportsProtectionEnabled() {
 }
 
 export function verifyAccessCode(value) {
-  return reportsProtectionEnabled() && safeEqual(value, process.env.REPORTS_ACCESS_CODE);
+  // Cada pessoa pode ter o próprio código: REPORTS_ACCESS_CODE e qualquer REPORTS_ACCESS_CODE_<NOME>.
+  if (!reportsProtectionEnabled()) return false;
+  const codes = Object.entries(process.env)
+    .filter(([name, code]) => (name === "REPORTS_ACCESS_CODE" || name.startsWith("REPORTS_ACCESS_CODE_")) && String(code || "").trim())
+    .map(([, code]) => String(code).trim());
+  return codes.map((code) => safeEqual(String(value).trim(), code)).some(Boolean);
 }
 
 export function createSessionCookie() {

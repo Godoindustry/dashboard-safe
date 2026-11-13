@@ -190,3 +190,23 @@ test('o site informa o que falta configurar sem revelar valores', async () => {
     }
   }
 });
+
+test('cada pessoa pode ter o próprio código de acesso', async () => {
+  const { verifyAccessCode } = await import('../netlify/functions/_shared/auth.mjs');
+  const antes = { a: process.env.REPORTS_ACCESS_CODE, b: process.env.REPORTS_ACCESS_CODE_ANDREZA };
+  try {
+    process.env.REPORTS_ACCESS_CODE = 'SafePoliana-2026';
+    process.env.REPORTS_ACCESS_CODE_ANDREZA = 'SafeAndreza-2026';
+    assert.equal(verifyAccessCode('SafePoliana-2026'), true);
+    assert.equal(verifyAccessCode('SafeAndreza-2026'), true);
+    assert.equal(verifyAccessCode('SafeAndreza-2025'), false);
+    assert.equal(verifyAccessCode(''), false);
+    delete process.env.REPORTS_ACCESS_CODE_ANDREZA;
+    assert.equal(verifyAccessCode('SafeAndreza-2026'), false);
+  } finally {
+    for (const [nome, valor] of [['REPORTS_ACCESS_CODE', antes.a], ['REPORTS_ACCESS_CODE_ANDREZA', antes.b]]) {
+      if (valor === undefined) delete process.env[nome];
+      else process.env[nome] = valor;
+    }
+  }
+});
