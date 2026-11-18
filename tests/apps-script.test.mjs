@@ -99,7 +99,7 @@ test('script da planilha grava registros e fotos pelo mesmo caminho da produçã
     const saved = await records.handler({ httpMethod: 'POST', headers, body: JSON.stringify({ front: 'safety', recordId, date: '2026-11-10', sector: 'Moinho', description: 'Piso escorregadio', status: 'Em aberto', priority: 'Alta', photoUrls: [photo.driveUrl] }) });
     assert.equal(saved.statusCode, 201, saved.body);
     const row = google.sheets['Inspeções por Setor'][2];
-    assert.equal(row[0], '2026-11-10');
+    assert.equal(row[0].toISOString().slice(0, 10), new Date(2026, 10, 10).toISOString().slice(0, 10));
     assert.equal(row[1], 'Moinho');
     assert.equal(row[3], 'Piso escorregadio');
     assert.match(row[10], new RegExp(`ID: ${recordId}.*drive\\.google\\.com`));
@@ -108,6 +108,7 @@ test('script da planilha grava registros e fotos pelo mesmo caminho da produçã
     const dds = await records.handler({ httpMethod: 'POST', headers, body: JSON.stringify({ front: 'training', recordId: 'SAFE-20261110-training-teste123abc', date: '2026-11-10', sector: 'Moinho', description: 'Ruído', registered: true }) });
     assert.equal(dds.statusCode, 201, dds.body);
     assert.equal(google.sheets.DDS[2][2], 'Ruído');
+    assert.ok(google.sheets.DDS[2][0] instanceof Date);
     assert.equal(google.sheets.DDS[2][10], 'Moinho');
 
     globalThis.fetch = async (target, init) => new Response(google.context.doPost({ postData: { contents: init.body.replace(token, 'errado') } }).text);
@@ -151,4 +152,18 @@ test('dashboard e script se pareiam sozinhos e depois o script recusa outro toke
     for (const key of Object.keys(process.env)) if (!(key in env)) delete process.env[key];
     Object.assign(process.env, env);
   }
+});
+
+test('corrigirDatas converte só as datas em texto das linhas do dashboard', async () => {
+  const google = fakeGoogle();
+  vm.createContext(google.context);
+  vm.runInContext(await readFile(new URL('../apps-script/Codigo.gs', import.meta.url), 'utf8'), google.context);
+  const aba = google.sheets['Inspeções por Setor'];
+  aba.push(['2026-10-28', 'Produção', '', '', '', '', '', '', '2026-11-05', '', 'ID: SAFE-20261028-safety-abc123xyz']);
+  aba.push(['2026-10-29', 'Moinho', 'digitado à mão']);
+  google.context.corrigirDatas();
+  assert.ok(aba[2][0] instanceof Date);
+  assert.equal(aba[2][0].getDate(), 28);
+  assert.ok(aba[2][8] instanceof Date);
+  assert.equal(aba[3][0], '2026-10-29');
 });

@@ -3,7 +3,7 @@ import { cronAuthorized, cronReply } from '../_shared/cron.mjs';
 
 export default {
   async fetch(request) {
-    const auth = cronAuthorized(request);
+    const auth = cronAuthorized(request, 'weekly');
     if (!auth.ok) return cronReply({ error: auth.error }, auth.status);
     try {
       return cronReply(await generateScheduledReport('weekly', new Date(), { enforceSchedule: false }));

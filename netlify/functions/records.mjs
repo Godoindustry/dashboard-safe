@@ -29,6 +29,28 @@ export function recordDestination(front) {
   return "inspections";
 }
 
+// Campos próprios de algumas frentes, que não têm coluna na planilha: entram em Observações.
+const EXTRA_FIELDS = [
+  ["machine", "Máquina / Equipamento"],
+  ["forklift", "Empilhadeira / Operador"],
+  ["contractor", "Empresa terceira / Prestador"],
+  ["emergencyItem", "Equipamento / Rota"],
+  ["brigadeItem", "Item de emergência / Brigada"],
+  ["cipaTopic", "Pauta / Reunião da CIPA"],
+  ["docName", "Documento / Rotina"],
+  ["pt", "Permissão de trabalho"],
+  ["days", "Dias de afastamento"],
+  ["certificate", "Atestado médico"],
+];
+
+function extraNotes(body) {
+  return EXTRA_FIELDS.map(([key, label]) => {
+    let value = safe(body[key], 200);
+    if (key === "certificate") value = value === "yes" ? "Sim" : value === "no" ? "Não" : "";
+    return value ? `${label}: ${value}` : "";
+  }).filter(Boolean);
+}
+
 export function normalizeRecord(body) {
   const front = validFront(body.front);
   const recordDate = date(body.date);
@@ -59,7 +81,7 @@ export function normalizeRecord(body) {
       conformity: safe(body.conformity, 80),
       owner: safe(body.owner, 160),
       evidence: [`ID: ${recordId}`, ...photoUrls].join(" | "),
-      notes: [`ID do lançamento: ${recordId}`, safe(body.notes, 1400)].filter(Boolean).join(" · "),
+      notes: [`ID do lançamento: ${recordId}`, ...extraNotes(body), safe(body.notes, 1400)].filter(Boolean).join(" · "),
       origin: `Site · ${FRONT_LABELS[front]} · ${recordId}`,
       shift: safe(body.shift, 80),
       participants: Math.max(0, Math.min(10000, Number(body.participants) || 0)) || "",

@@ -77,11 +77,15 @@ const ACOES_ = {
     const colunaA = aba.getRange(1, 1, Math.max(1, aba.getLastRow()), 1).getDisplayValues();
     let ultima = colunaA.length;
     while (ultima > 0 && !String(colunaA[ultima - 1][0]).trim()) ultima--;
-    const destino = aba.getRange(ultima + 1, 1, 1, row.length);
-    // Campo vazio não apaga o que já existe na linha (ex.: lista de setores ao lado do DDS).
-    const atual = destino.getDisplayValues()[0];
-    destino.setNumberFormat('@');
-    destino.setValues([row.map(function (v, i) { return v === '' ? atual[i] : v; })]);
+    // Só as células com valor são escritas: campo vazio não apaga o que já existe na linha
+    // (ex.: lista de setores ao lado do DDS). Data vira data de verdade; o resto entra como texto.
+    row.forEach(function (v, i) {
+      if (v === '') return;
+      const celula = aba.getRange(ultima + 1, i + 1, 1, 1);
+      const data = dataIso_(v);
+      celula.setNumberFormat(data ? 'dd/mm/yyyy' : '@');
+      celula.setValues([[data || v]]);
+    });
     return { row: ultima + 1 };
   },
 
@@ -118,6 +122,36 @@ const ACOES_ = {
     return { file: arquivoParaJson_(arquivo), base64: Utilities.base64Encode(arquivo.getBlob().getBytes()) };
   },
 };
+
+function dataIso_(valor) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(valor));
+  // Meio-dia: se o fuso do script for diferente do da planilha, a data não cai no dia anterior.
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12) : null;
+}
+
+// Rode uma vez pelo editor: as primeiras linhas do dashboard gravaram a data como texto
+// (aaaa-mm-dd), que o Google não mostra na coluna de datas. Converte só linhas do dashboard.
+function corrigirDatas() {
+  const planilha = SpreadsheetApp.openById(SAFE_SHEET_ID);
+  let corrigidas = 0;
+  ['Inspeções por Setor', 'Pendências', 'DDS'].forEach(function (nome) {
+    const aba = planilha.getSheetByName(nome);
+    if (!aba || aba.getLastRow() < 1) return;
+    const valores = aba.getRange(1, 1, aba.getLastRow(), aba.getLastColumn()).getDisplayValues();
+    valores.forEach(function (linha, i) {
+      if (!linha.some(function (c) { return String(c).indexOf('SAFE-') >= 0; })) return;
+      linha.forEach(function (c, j) {
+        const data = dataIso_(c);
+        if (!data) return;
+        const celula = aba.getRange(i + 1, j + 1, 1, 1);
+        celula.setNumberFormat('dd/mm/yyyy');
+        celula.setValues([[data]]);
+        corrigidas++;
+      });
+    });
+  });
+  Logger.log('Datas corrigidas: ' + corrigidas);
+}
 
 function arquivoParaJson_(arquivo) {
   let meta = {};

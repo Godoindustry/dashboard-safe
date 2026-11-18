@@ -5,7 +5,7 @@ import { recordDestination, normalizeRecord } from '../netlify/functions/records
 import { decodePhoto, validDate } from '../netlify/functions/photos.mjs';
 import { parseGvizRows } from '../netlify/functions/_shared/google-sheets.mjs';
 import { runLegacyHandler } from '../api/_shared/adapter.mjs';
-import { cronAuthorized, isLastDayInSaoPaulo } from '../api/_shared/cron.mjs';
+import { cronAuthorized, isLastDayInSaoPaulo, withinScheduledHour } from '../api/_shared/cron.mjs';
 
 test('agendamento semanal respeita sexta-feira às 16h em São Paulo', () => {
   assert.equal(scheduledReportDue('weekly', new Date('2026-09-25T19:00:00Z')), true);
@@ -63,4 +63,26 @@ test('cron da Vercel exige segredo e reconhece o último dia em São Paulo', () 
   } finally {
     if (previous === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = previous;
   }
+});
+
+test('sem CRON_SECRET, só o agendador da Vercel e só na hora marcada gera relatório', () => {
+  const previous = process.env.CRON_SECRET;
+  delete process.env.CRON_SECRET;
+  try {
+    const sexta16h = new Date('2026-11-20T19:23:00Z');
+    const vercel = new Request('https://safe.test/api/cron', { headers: { 'user-agent': 'vercel-cron/1.0' } });
+    assert.equal(cronAuthorized(vercel, 'weekly', sexta16h).ok, true);
+    assert.equal(cronAuthorized(vercel, 'weekly', new Date('2026-11-19T19:23:00Z')).status, 403);
+    assert.equal(cronAuthorized(new Request('https://safe.test/api/cron'), 'weekly', sexta16h).status, 401);
+    assert.equal(withinScheduledHour('monthly', new Date('2026-11-30T18:40:00Z')), true);
+    assert.equal(withinScheduledHour('monthly', new Date('2026-11-29T18:40:00Z')), false);
+  } finally {
+    if (previous !== undefined) process.env.CRON_SECRET = previous;
+  }
+});
+
+test('campos próprios das frentes não se perdem: vão para Observações', async () => {
+  const { normalizeRecord } = await import('../netlify/functions/records.mjs');
+  const record = normalizeRecord({ front: 'machines', recordId: 'SAFE-20261118-machines-abc123xyz', date: '2026-11-18', sector: 'Produção', description: 'Proteção aberta', machine: 'Injetora 03', notes: 'Avisar manutenção' });
+  assert.match(record.values.notes, /Máquina \/ Equipamento: Injetora 03 · Avisar manutenção/);
 });

@@ -6,11 +6,29 @@ function same(left, right) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-export function cronAuthorized(request) {
+function saoPauloParts(now) {
+  const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'short', hour: '2-digit', hourCycle: 'h23' });
+  return Object.fromEntries(formatter.formatToParts(now).map((part) => [part.type, part.value]));
+}
+
+// Na hora do agendamento em São Paulo (a Vercel Hobby dispara em qualquer minuto da hora).
+export function withinScheduledHour(type, now = new Date()) {
+  const parts = saoPauloParts(now);
+  if (type === 'weekly') return parts.weekday === 'Fri' && parts.hour === '16';
+  return type === 'monthly' && parts.hour === '15' && isLastDayInSaoPaulo(now);
+}
+
+// Com CRON_SECRET, vale o segredo. Sem ele, aceita só o agendador da Vercel e só na hora
+// marcada: fora dela ninguém consegue antecipar um relatório (que não se repete no período).
+export function cronAuthorized(request, type, now = new Date()) {
   const secret = String(process.env.CRON_SECRET || '');
-  if (secret.length < 16) return { ok: false, status: 503, error: 'Configure CRON_SECRET na Vercel com pelo menos 16 caracteres.' };
-  const provided = request.headers.get('authorization') || '';
-  return same(provided, `Bearer ${secret}`) ? { ok: true } : { ok: false, status: 401, error: 'Agendamento não autorizado.' };
+  if (secret.length >= 16) {
+    const provided = request.headers.get('authorization') || '';
+    return same(provided, `Bearer ${secret}`) ? { ok: true } : { ok: false, status: 401, error: 'Agendamento não autorizado.' };
+  }
+  if (!/vercel-cron/i.test(request.headers.get('user-agent') || '')) return { ok: false, status: 401, error: 'Agendamento não autorizado.' };
+  if (!withinScheduledHour(type, now)) return { ok: false, status: 403, error: 'Fora do horário do relatório automático.' };
+  return { ok: true };
 }
 
 export function isLastDayInSaoPaulo(now = new Date()) {

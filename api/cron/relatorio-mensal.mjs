@@ -3,7 +3,7 @@ import { cronAuthorized, cronReply, isLastDayInSaoPaulo } from '../_shared/cron.
 
 export default {
   async fetch(request) {
-    const auth = cronAuthorized(request);
+    const auth = cronAuthorized(request, 'monthly');
     if (!auth.ok) return cronReply({ error: auth.error }, auth.status);
     const now = new Date();
     if (!isLastDayInSaoPaulo(now)) return cronReply({ status: 'skipped', reason: 'not-last-day-in-sao-paulo' });
